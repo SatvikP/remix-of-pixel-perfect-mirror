@@ -1,15 +1,17 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { FileUploader } from '@/components/FileUploader';
 import { HierarchicalClusters } from '@/components/HierarchicalClusters';
 import { EnhancedStartupsTable } from '@/components/EnhancedStartupsTable';
 import { ProcessingStatus, ProcessingStep } from '@/components/ProcessingStatus';
 import { StatsCards } from '@/components/StatsCards';
-import { clusterStartups, parseCSV } from '@/lib/api';
+import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult } from '@/lib/types';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function Index() {
   const { toast } = useToast();
@@ -20,6 +22,57 @@ export default function Index() {
   const [error, setError] = useState<string | undefined>();
   const [result, setResult] = useState<ClusteringResult | null>(null);
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
+  
+  // Article state
+  const [dbArticles, setDbArticles] = useState<Article[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [articlesLoading, setArticlesLoading] = useState(true);
+
+  // Fetch articles from database on mount
+  useEffect(() => {
+    async function loadArticles() {
+      setArticlesLoading(true);
+      try {
+        const { articles, lastUpdated: updated, count } = await fetchArticlesFromDatabase();
+        setDbArticles(articles);
+        setLastUpdated(updated);
+        console.log(`Loaded ${count} articles from database`);
+      } catch (err) {
+        console.error('Error loading articles:', err);
+      } finally {
+        setArticlesLoading(false);
+      }
+    }
+    loadArticles();
+  }, []);
+
+  const handleRefreshArticles = async () => {
+    setIsRefreshing(true);
+    toast({ title: 'Refreshing articles...', description: 'This may take a few minutes as we scrape 7 sources.' });
+    
+    try {
+      const result = await triggerArticleScrape();
+      
+      if (result.success) {
+        toast({ 
+          title: 'Articles refreshed!', 
+          description: `Scraped ${result.stats?.recentArticles || 0} articles, saved ${result.stats?.savedToDb || 0} to database.` 
+        });
+        
+        // Reload articles from database
+        const { articles, lastUpdated: updated } = await fetchArticlesFromDatabase();
+        setDbArticles(articles);
+        setLastUpdated(updated);
+      } else {
+        toast({ title: 'Refresh failed', description: result.error, variant: 'destructive' });
+      }
+    } catch (err) {
+      toast({ title: 'Refresh failed', description: String(err), variant: 'destructive' });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleFileSelect = useCallback((file: File) => {
     setCsvFile(file);
@@ -54,9 +107,16 @@ export default function Index() {
         return;
       }
 
-      // Convert articles to scraped format directly
-      const articles = siftedArticles as Article[];
-      console.log(`Using ${articles.length} articles from JSON for analysis`);
+      // Use database articles if available, otherwise fallback to static JSON
+      let articles: Article[];
+      if (dbArticles.length > 0) {
+        articles = dbArticles;
+        console.log(`Using ${articles.length} articles from database`);
+      } else {
+        articles = siftedArticles as Article[];
+        console.log(`Using ${articles.length} articles from static JSON (database empty)`);
+      }
+
       setProcessingStep('scraping');
       setProgress(25);
       setStatusMessage(`Preparing ${articles.length} articles for analysis...`);
@@ -114,6 +174,47 @@ export default function Index() {
       <main className="container py-8 space-y-8">
         {!result && (
           <div className="max-w-xl mx-auto space-y-6">
+            {/* Article Status Card */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-muted">
+                      {dbArticles.length > 0 ? (
+                        <Database className="h-5 w-5 text-green-600" />
+                      ) : (
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        {articlesLoading ? 'Loading articles...' : (
+                          dbArticles.length > 0 
+                            ? `${dbArticles.length} articles from 7 EU sources`
+                            : `${(siftedArticles as Article[]).length} articles (static backup)`
+                        )}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {lastUpdated 
+                          ? `Last updated: ${format(new Date(lastUpdated), 'MMM d, yyyy h:mm a')}`
+                          : 'No database articles yet'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleRefreshArticles}
+                    disabled={isRefreshing}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="text-center mb-8">
               <h2 className="text-xl font-semibold mb-2">Upload Your Startups</h2>
               <p className="text-muted-foreground">CSV with columns: Name, Website, Tags, Location, Stage, Business Type</p>

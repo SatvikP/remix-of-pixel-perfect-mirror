@@ -38,100 +38,154 @@ interface FirecrawlScrapeResponse {
   error?: string;
 }
 
-const SIFTED_BASE = "https://sifted.eu";
+// All 7 EU startup news sources
+const SOURCES = {
+  sifted: {
+    name: "sifted",
+    baseUrl: "https://sifted.eu",
+    latestPath: "/latest",
+    articlePattern: /^https:\/\/sifted\.eu\/articles\/[^\/\s]+\/?$/,
+    linkExtractPattern: /https:\/\/sifted\.eu\/articles\/[^\s\)]+/g,
+  },
+  tech_eu: {
+    name: "tech_eu",
+    baseUrl: "https://tech.eu",
+    latestPath: "/news",
+    articlePattern: /^https:\/\/tech\.eu\/\d{4}\/\d{2}\/\d{2}\/[^\/\s]+\/?$/,
+    linkExtractPattern: /https:\/\/tech\.eu\/\d{4}\/\d{2}\/\d{2}\/[^\s\)\"]+/g,
+  },
+  eu_startups: {
+    name: "eu_startups",
+    baseUrl: "https://www.eu-startups.com",
+    latestPath: "/category/news",
+    articlePattern: /^https:\/\/www\.eu-startups\.com\/\d{4}\/\d{2}\/[^\/\s]+\/?$/,
+    linkExtractPattern: /https:\/\/www\.eu-startups\.com\/\d{4}\/\d{2}\/[^\s\)\"]+/g,
+  },
+  silicon_canals: {
+    name: "silicon_canals",
+    baseUrl: "https://siliconcanals.com",
+    latestPath: "/news",
+    articlePattern: /^https:\/\/siliconcanals\.com\/news\/[^\/\s]+\/?$/,
+    linkExtractPattern: /https:\/\/siliconcanals\.com\/news\/[^\s\)\"]+/g,
+  },
+  maddyness: {
+    name: "maddyness",
+    baseUrl: "https://www.maddyness.com",
+    latestPath: "/uk/category/startups",
+    articlePattern: /^https:\/\/www\.maddyness\.com\/uk\/\d{4}\/\d{2}\/\d{2}\/[^\/\s]+\/?$/,
+    linkExtractPattern: /https:\/\/www\.maddyness\.com\/uk\/\d{4}\/\d{2}\/\d{2}\/[^\s\)\"]+/g,
+  },
+  bpifrance_hub: {
+    name: "bpifrance_hub",
+    baseUrl: "https://lehub.bpifrance.fr",
+    latestPath: "/actualites",
+    articlePattern: /^https:\/\/lehub\.bpifrance\.fr\/[^\/\s]+\/?$/,
+    linkExtractPattern: /https:\/\/lehub\.bpifrance\.fr\/[^\s\)\"]+/g,
+  },
+  bpifrance_big: {
+    name: "bpifrance_big",
+    baseUrl: "https://bigmedia.bpifrance.fr",
+    latestPath: "/decryptages",
+    articlePattern: /^https:\/\/bigmedia\.bpifrance\.fr\/nos-dossiers\/[^\/\s]+\/?$/,
+    linkExtractPattern: /https:\/\/bigmedia\.bpifrance\.fr\/nos-dossiers\/[^\s\)\"]+/g,
+  },
+};
 
-// Extract article URLs from Sifted's latest pages using Firecrawl map
-async function discoverArticles(apiKey: string): Promise<string[]> {
-  console.log("Discovering articles from Sifted...");
+// Discover article URLs from a source using Firecrawl map
+async function discoverSourceArticles(
+  source: typeof SOURCES[keyof typeof SOURCES],
+  apiKey: string
+): Promise<string[]> {
+  console.log(`Discovering articles from ${source.name}...`);
   
   const allUrls: string[] = [];
+  const fullUrl = `${source.baseUrl}${source.latestPath}`;
   
-  // Use Firecrawl map to discover article URLs
-  const mapResponse = await fetch("https://api.firecrawl.dev/v1/map", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      url: `${SIFTED_BASE}/latest`,
-      search: "articles",
-      limit: 100,
-    }),
-  });
+  try {
+    // Try Firecrawl map first
+    const mapResponse = await fetch("https://api.firecrawl.dev/v1/map", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        url: fullUrl,
+        search: "articles",
+        limit: 50,
+      }),
+    });
 
-  const mapData: FirecrawlMapResponse = await mapResponse.json();
-  
-  if (mapData.success && mapData.links) {
-    const articleUrls = mapData.links.filter(url => 
-      url.match(/^https:\/\/sifted\.eu\/articles\/[^\/\s]+\/?$/)
-    );
-    allUrls.push(...articleUrls);
-    console.log(`Found ${articleUrls.length} article URLs from map`);
-  } else {
-    console.log("Map failed, trying scrape method:", mapData.error);
+    const mapData: FirecrawlMapResponse = await mapResponse.json();
     
-    // Fallback: scrape the latest page directly
-    for (let page = 1; page <= 5; page++) {
-      const pageUrl = page === 1 ? `${SIFTED_BASE}/latest` : `${SIFTED_BASE}/latest/page/${page}`;
+    if (mapData.success && mapData.links) {
+      const articleUrls = mapData.links.filter(url => source.articlePattern.test(url));
+      allUrls.push(...articleUrls);
+      console.log(`[${source.name}] Found ${articleUrls.length} article URLs from map`);
+    } else {
+      console.log(`[${source.name}] Map failed, trying scrape method`);
       
-      try {
-        const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            url: pageUrl,
-            formats: ["markdown"],
-          }),
-        });
+      // Fallback: scrape the latest page directly
+      const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          url: fullUrl,
+          formats: ["markdown"],
+        }),
+      });
 
-        const scrapeData: FirecrawlScrapeResponse = await scrapeResponse.json();
-        
-        if (scrapeData.success && scrapeData.data?.markdown) {
-          // Extract article URLs from markdown
-          const urlMatches = scrapeData.data.markdown.match(/https:\/\/sifted\.eu\/articles\/[^\s\)]+/g) || [];
-          const cleanUrls = urlMatches.map(u => u.replace(/[)\]]+$/, ''));
-          allUrls.push(...cleanUrls);
-        }
-      } catch (e) {
-        console.log(`Error scraping page ${page}:`, e);
+      const scrapeData: FirecrawlScrapeResponse = await scrapeResponse.json();
+      
+      if (scrapeData.success && scrapeData.data?.markdown) {
+        const urlMatches = scrapeData.data.markdown.match(source.linkExtractPattern) || [];
+        const cleanUrls = urlMatches
+          .map(u => u.replace(/[)\]\"]+$/, ''))
+          .filter(u => source.articlePattern.test(u));
+        allUrls.push(...cleanUrls);
+        console.log(`[${source.name}] Found ${cleanUrls.length} article URLs from scrape`);
       }
     }
+  } catch (e) {
+    console.error(`[${source.name}] Error discovering articles:`, e);
   }
 
-  // Dedupe
+  // Dedupe and limit
   const uniqueUrls = [...new Set(allUrls.map(u => u.replace(/\/$/, '')))];
-  console.log(`Total unique article URLs: ${uniqueUrls.length}`);
-  
-  return uniqueUrls.slice(0, 80); // Limit to 80 articles
+  return uniqueUrls.slice(0, 30); // Limit per source
 }
 
 // Parse article content from scraped data
-function parseArticle(url: string, data: FirecrawlScrapeResponse["data"]): Article {
+function parseArticle(
+  url: string, 
+  source: string,
+  data: FirecrawlScrapeResponse["data"]
+): Article {
   const metadata = data?.metadata || {};
   
-  // Extract authors from markdown if available
+  // Extract authors
   const authors: string[] = [];
   if (metadata.author) {
     authors.push(...metadata.author.split(/[,&]/).map(a => a.trim()).filter(Boolean));
   }
 
-  // Extract tags from URL or metadata
+  // Extract tags from keywords
   const tags: string[] = [];
   if (metadata.keywords) {
     tags.push(...metadata.keywords.split(",").map(t => t.trim()).filter(Boolean));
   }
 
-  // Check if article is Pro (from content)
-  const isPro = data?.markdown?.includes("Sifted Pro") || 
-                data?.markdown?.includes("Pro members") ||
-                false;
+  // Check if article is Pro (Sifted-specific)
+  const isPro = source === "sifted" && Boolean(
+    data?.markdown?.includes("Sifted Pro") || 
+    data?.markdown?.includes("Pro members")
+  );
 
   return {
-    source: "sifted",
+    source,
     url,
     title: metadata.title || null,
     published_date: metadata.publishedTime || null,
@@ -143,14 +197,18 @@ function parseArticle(url: string, data: FirecrawlScrapeResponse["data"]): Artic
   };
 }
 
-// Scrape individual articles
-async function scrapeArticles(urls: string[], apiKey: string): Promise<Article[]> {
+// Scrape individual articles from a source
+async function scrapeArticles(
+  urls: string[], 
+  source: string,
+  apiKey: string
+): Promise<Article[]> {
   const articles: Article[] = [];
   const batchSize = 5;
   
   for (let i = 0; i < urls.length; i += batchSize) {
     const batch = urls.slice(i, i + batchSize);
-    console.log(`Scraping batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urls.length/batchSize)}`);
+    console.log(`[${source}] Scraping batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urls.length/batchSize)}`);
     
     const promises = batch.map(async (url) => {
       try {
@@ -169,11 +227,11 @@ async function scrapeArticles(urls: string[], apiKey: string): Promise<Article[]
         const data: FirecrawlScrapeResponse = await response.json();
         
         if (data.success && data.data) {
-          return parseArticle(url, data.data);
+          return parseArticle(url, source, data.data);
         }
         return null;
       } catch (e) {
-        console.log(`Error scraping ${url}:`, e);
+        console.log(`[${source}] Error scraping ${url}:`, e);
         return null;
       }
     });
@@ -207,6 +265,53 @@ function filterRecentArticles(articles: Article[]): Article[] {
   });
 }
 
+// Upsert articles to database
+async function saveArticlesToDatabase(
+  articles: Article[],
+  supabaseUrl: string,
+  supabaseKey: string
+): Promise<{ inserted: number; updated: number; errors: number }> {
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  
+  let inserted = 0;
+  let updated = 0;
+  let errors = 0;
+
+  for (const article of articles) {
+    try {
+      const { error } = await supabase
+        .from('articles')
+        .upsert({
+          source: article.source,
+          url: article.url,
+          title: article.title,
+          excerpt: article.excerpt,
+          published_date: article.published_date,
+          authors: article.authors,
+          section: article.section,
+          tags: article.tags,
+          is_pro: article.is_pro,
+        }, { 
+          onConflict: 'url',
+          ignoreDuplicates: false 
+        });
+
+      if (error) {
+        console.error(`Error upserting article ${article.url}:`, error);
+        errors++;
+      } else {
+        // Can't easily tell if insert or update, count as success
+        inserted++;
+      }
+    } catch (e) {
+      console.error(`Exception upserting article:`, e);
+      errors++;
+    }
+  }
+
+  return { inserted, updated, errors };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -225,34 +330,69 @@ Deno.serve(async (req) => {
       throw new Error("Supabase credentials not configured");
     }
 
-    console.log("Starting daily Sifted scrape...");
+    console.log("Starting daily EU startup news scrape (7 sources)...");
     const startTime = Date.now();
 
-    // 1. Discover article URLs
-    const articleUrls = await discoverArticles(firecrawlKey);
-    
-    if (articleUrls.length === 0) {
-      throw new Error("No article URLs discovered");
+    const allArticles: Article[] = [];
+    const sourceStats: Record<string, { discovered: number; scraped: number }> = {};
+
+    // Process each source
+    for (const [key, source] of Object.entries(SOURCES)) {
+      try {
+        console.log(`\n=== Processing ${source.name} ===`);
+        
+        // 1. Discover articles
+        const articleUrls = await discoverSourceArticles(source, firecrawlKey);
+        
+        if (articleUrls.length === 0) {
+          console.log(`[${source.name}] No articles discovered, skipping`);
+          sourceStats[key] = { discovered: 0, scraped: 0 };
+          continue;
+        }
+
+        // 2. Scrape articles
+        const articles = await scrapeArticles(articleUrls, source.name, firecrawlKey);
+        allArticles.push(...articles);
+        
+        sourceStats[key] = { 
+          discovered: articleUrls.length, 
+          scraped: articles.length 
+        };
+        
+        console.log(`[${source.name}] Scraped ${articles.length}/${articleUrls.length} articles`);
+        
+        // Delay between sources to avoid rate limiting
+        await new Promise(r => setTimeout(r, 1000));
+        
+      } catch (e) {
+        console.error(`[${source.name}] Source error:`, e);
+        sourceStats[key] = { discovered: 0, scraped: 0 };
+      }
     }
 
-    // 2. Scrape articles
-    const allArticles = await scrapeArticles(articleUrls, firecrawlKey);
-    console.log(`Scraped ${allArticles.length} articles`);
+    console.log(`\nTotal scraped: ${allArticles.length} articles`);
 
     // 3. Filter to last 7 days
     const recentArticles = filterRecentArticles(allArticles);
     console.log(`${recentArticles.length} articles from last 7 days`);
 
+    // 4. Save to database
+    console.log("Saving to database...");
+    const dbResult = await saveArticlesToDatabase(recentArticles, supabaseUrl, supabaseKey);
+    console.log(`Database: ${dbResult.inserted} saved, ${dbResult.errors} errors`);
+
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`Daily scrape completed in ${duration}s`);
+    console.log(`\nDaily scrape completed in ${duration}s`);
 
     return new Response(
       JSON.stringify({
         success: true,
         stats: {
-          discovered: articleUrls.length,
-          scraped: allArticles.length,
-          recent: recentArticles.length,
+          sources: sourceStats,
+          totalScraped: allArticles.length,
+          recentArticles: recentArticles.length,
+          savedToDb: dbResult.inserted,
+          dbErrors: dbResult.errors,
           durationSeconds: parseFloat(duration),
         },
         articles: recentArticles,
