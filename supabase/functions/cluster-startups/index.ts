@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { scrapedArticles, startups, numClusters = 6 } = await req.json() as {
+    const { scrapedArticles, startups, numClusters = 10 } = await req.json() as {
       scrapedArticles: ScrapedArticle[];
       startups: Startup[];
       numClusters?: number;
@@ -96,24 +96,26 @@ Deno.serve(async (req) => {
       return `[${idx + 1}] "${article.title}"${fundingInfo}${recencyInfo} - ${article.excerpt}`;
     }).join('\n');
 
-    const clusterPrompt = `Analyze these startup/tech news articles and identify ${numClusters} thematic trend clusters.
+const clusterPrompt = `Analyze these startup/tech news articles and identify ${numClusters} SPECIFIC and GRANULAR trend clusters.
 
-Articles (with funding and recency info):
+Articles:
 ${articleSummaries}
 
-Create clusters based on industry themes. For each cluster, assess its "trendiness" based on:
-1. Article recency (more recent = trendier)
-2. Funding amounts (higher funding = hotter sector)
-3. Article volume (more articles = more attention)
+Create SPECIFIC, NICHE clusters - not broad categories. Examples of good clusters:
+- "AI Code Assistants" NOT "Artificial Intelligence"
+- "Electric Vehicle Batteries" NOT "Clean Energy"
+- "Enterprise Security Automation" NOT "Cybersecurity"
+- "AI Drug Discovery" NOT "Healthcare Tech"
+- "Vertical SaaS for Construction" NOT "B2B Software"
 
 Return JSON:
 {
   "clusters": [
     {
       "id": 1,
-      "name": "Short 2-4 word name like 'AI Infrastructure'",
-      "description": "2-3 sentence description",
-      "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
+      "name": "Specific 3-5 word niche like 'AI-Powered Legal Tech'",
+      "description": "2-3 sentence description of this specific niche",
+      "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8"],
       "articleIndices": [1, 5, 12],
       "trendScore": 85
     }
@@ -121,9 +123,10 @@ Return JSON:
 }
 
 Rules:
+- Be SPECIFIC and GRANULAR - avoid broad categories
 - Each article in exactly ONE cluster
 - trendScore: 0-100 based on recency + funding + volume
-- Include 5-8 relevant keywords
+- Include 6-10 specific keywords per cluster
 - Return ONLY valid JSON`;
 
     console.log('Calling AI to identify clusters...');
