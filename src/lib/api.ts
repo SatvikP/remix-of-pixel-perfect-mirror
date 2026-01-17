@@ -1,6 +1,70 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Article, ScrapeResult, Startup, ClusteringResult, ScrapedArticle } from "./types";
 
+// Fetch articles from the database
+export async function fetchArticlesFromDatabase(): Promise<{
+  articles: Article[];
+  lastUpdated: string | null;
+  count: number;
+}> {
+  const { data, error } = await supabase
+    .from('articles')
+    .select('*')
+    .order('published_date', { ascending: false })
+    .limit(500);
+
+  if (error) {
+    console.error('Error fetching articles:', error);
+    return { articles: [], lastUpdated: null, count: 0 };
+  }
+
+  // Get the most recent update time
+  const lastUpdated = data?.[0]?.updated_at || data?.[0]?.created_at || null;
+
+  // Convert database format to Article format
+  const articles: Article[] = (data || []).map(row => ({
+    source: row.source,
+    url: row.url,
+    title: row.title,
+    published_date: row.published_date,
+    authors: row.authors || [],
+    section: row.section,
+    tags: row.tags || [],
+    is_pro: row.is_pro || false,
+    excerpt: row.excerpt || '',
+  }));
+
+  return { 
+    articles, 
+    lastUpdated,
+    count: articles.length 
+  };
+}
+
+// Trigger a manual refresh of articles
+export async function triggerArticleScrape(): Promise<{
+  success: boolean;
+  stats?: {
+    totalScraped: number;
+    recentArticles: number;
+    savedToDb: number;
+  };
+  error?: string;
+}> {
+  const { data, error } = await supabase.functions.invoke('scrape-sifted-daily');
+
+  if (error) {
+    console.error('Scrape trigger error:', error);
+    return { success: false, error: error.message };
+  }
+
+  return {
+    success: data?.success || false,
+    stats: data?.stats,
+    error: data?.error,
+  };
+}
+
 export async function scrapeArticles(articles: Article[]): Promise<ScrapeResult> {
   const { data, error } = await supabase.functions.invoke('scrape-articles', {
     body: { articles },
