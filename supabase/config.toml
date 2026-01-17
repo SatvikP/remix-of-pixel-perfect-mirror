@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.cluster-startups]
 verify_jwt = false
+
+[functions.scrape-sifted-daily]
+verify_jwt = false
