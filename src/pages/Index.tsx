@@ -6,7 +6,7 @@ import { ClusterOverview } from '@/components/ClusterOverview';
 import { StartupsTable } from '@/components/StartupsTable';
 import { ProcessingStatus, ProcessingStep } from '@/components/ProcessingStatus';
 import { StatsCards } from '@/components/StatsCards';
-import { scrapeArticles, clusterStartups, parseCSV } from '@/lib/api';
+import { clusterStartups, parseCSV } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult } from '@/lib/types';
 import siftedArticles from '@/data/sifted_articles.json';
 import { Sparkles, RotateCcw } from 'lucide-react';
@@ -20,7 +20,6 @@ export default function Index() {
   const [error, setError] = useState<string | undefined>();
   const [result, setResult] = useState<ClusteringResult | null>(null);
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
-  const [scrapedData, setScrapedData] = useState<ScrapedArticle[] | null>(null);
 
   const handleFileSelect = useCallback((file: File) => {
     setCsvFile(file);
@@ -55,20 +54,22 @@ export default function Index() {
         return;
       }
 
-      let articlesToUse = scrapedData;
+      // Convert articles to scraped format directly (no need to call Firecrawl)
+      // The JSON already has title + excerpt which is enough for AI clustering
+      const articles = siftedArticles as Article[];
+      console.log(`Using ${articles.length} articles from JSON for analysis`);
+      setProcessingStep('scraping');
+      setProgress(25);
+      setStatusMessage(`Preparing ${articles.length} articles for analysis...`);
       
-      if (!articlesToUse) {
-        setProcessingStep('scraping');
-        setProgress(0);
-        setStatusMessage(`Scraping ${siftedArticles.length} articles...`);
-        
-        const articles = siftedArticles as Article[];
-        const scrapeResult = await scrapeArticles(articles); // Analyze all articles
-        
-        if (!scrapeResult.success) throw new Error(scrapeResult.error || 'Failed to scrape');
-        articlesToUse = scrapeResult.data || [];
-        setScrapedData(articlesToUse);
-      }
+      // Convert Article[] to ScrapedArticle[] format
+      const articlesToUse: ScrapedArticle[] = articles.map(article => ({
+        url: article.url,
+        title: article.title,
+        excerpt: article.excerpt,
+        content: `${article.title}. ${article.excerpt}`, // Use title+excerpt as content
+        scrapedAt: new Date().toISOString(),
+      }));
 
       setProcessingStep('clustering');
       setProgress(50);
