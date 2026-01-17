@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { scrapedArticles, startups, numClusters = 12 } = await req.json() as {
+    const { scrapedArticles, startups, numClusters = 20 } = await req.json() as {
       scrapedArticles: ScrapedArticle[];
       startups: Startup[];
       numClusters?: number;
@@ -124,11 +124,14 @@ Parent categories (MUST use one of these):
 - climate: CleanTech, renewables, sustainability, carbon capture
 - other: Other emerging sectors
 
-Create SPECIFIC, NICHE clusters within these parent categories. Examples:
-- "AI Drug Discovery" (parent: biotech) NOT just "Healthcare"
-- "Vertical SaaS for Construction" (parent: saas) NOT just "B2B Software"
-- "Electric Vehicle Batteries" (parent: climate) NOT just "Clean Energy"
-- "AI Code Assistants" (parent: saas) NOT just "AI"
+Create SPECIFIC but BROAD-ENOUGH clusters to capture most startups. Examples:
+- "AI & Automation Tools" (parent: saas) - catches many AI startups
+- "Digital Health & Wellness" (parent: biotech) - catches health apps
+- "B2B Software & Enterprise" (parent: saas) - catches general B2B
+- "Consumer & Retail Tech" (parent: marketplace) - catches e-commerce
+- "Sustainability Solutions" (parent: climate) - catches green startups
+
+Aim for 3-5 clusters per parent category so startups can find a match.
 
 Return JSON:
 {
@@ -246,21 +249,27 @@ Rules:
       `Cluster ${c.id}: "${c.name}" (Category: ${c.parentCategory}, Trend: ${c.trendScore}/100) - Keywords: ${c.keywords.join(', ')}`
     ).join('\n');
 
-    const matchPrompt = `Match startups to trend clusters and calculate detailed investment scores with breakdown.
+    const matchPrompt = `Match ALL startups to trend clusters. EVERY startup must be matched to at least one cluster.
 
-CLUSTERS (sorted by trend score):
+CLUSTERS:
 ${clusterInfo}
 
 STARTUPS:
 ${startupData}
 
+IMPORTANT: You MUST match EVERY startup to at least 1-3 clusters. Be lenient and creative:
+- Match by name keywords, tags, website domain hints
+- If a startup seems tech-related, match to relevant tech clusters
+- If unclear, match to the most general applicable cluster
+- NO startup should have 0 matches
+
 For each startup, calculate:
-1. Which clusters they match (based on name, tags, website, business type)
-2. Match score per cluster (0-1)
-3. Investment score breakdown:
-   - trendAlignment (0-40): How well they align with HIGH-trend clusters
-   - marketTiming (0-30): Is the market ready? Are they positioned well?
-   - sectorFit (0-30): How well does their sector match trending areas?
+1. Clusters they match (1-4 clusters per startup, be generous)
+2. Match score per cluster (0.3-1.0)
+3. Score breakdown:
+   - trendAlignment (0-40): Alignment with trending clusters
+   - marketTiming (0-30): Market readiness signals
+   - sectorFit (0-30): Sector match quality
 
 Return JSON:
 {
@@ -268,25 +277,23 @@ Return JSON:
     {
       "startupIndex": 1,
       "clusters": [
-        { "clusterId": 1, "score": 0.85 }
+        { "clusterId": 1, "score": 0.75 }
       ],
       "scoreBreakdown": {
-        "trendAlignment": 32,
-        "marketTiming": 25,
-        "sectorFit": 21
+        "trendAlignment": 28,
+        "marketTiming": 22,
+        "sectorFit": 20
       },
-      "trendCorrelation": 0.82
+      "trendCorrelation": 0.70
     }
   ]
 }
 
-Rules:
-- trendAlignment: 0-40, based on cluster trend scores
-- marketTiming: 0-30, based on market signals
-- sectorFit: 0-30, how well startup fits trending sectors
-- Total investmentScore = trendAlignment + marketTiming + sectorFit (0-100)
-- trendCorrelation: 0-1, overall trend alignment
-- Up to 3 clusters per startup, score > 0.3
+CRITICAL RULES:
+- EVERY startup in the list MUST appear in matches (indices 1 to ${startups.length})
+- Each startup needs 1-4 cluster matches minimum
+- Be generous with matching - partial relevance counts
+- Even vague matches get score 0.3-0.5
 - Return ONLY valid JSON`;
 
     console.log('Calling AI to match startups with score breakdowns...');

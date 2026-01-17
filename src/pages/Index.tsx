@@ -74,7 +74,7 @@ export default function Index() {
       setProgress(50);
       setStatusMessage(`Clustering ${startups.length} startups into hierarchical sectors...`);
 
-      const clusterResult = await clusterStartups(articlesToUse, startups, 12);
+      const clusterResult = await clusterStartups(articlesToUse, startups, 20);
       if (!clusterResult.success) throw new Error(clusterResult.error || 'Failed to cluster');
 
       setResult(clusterResult);
