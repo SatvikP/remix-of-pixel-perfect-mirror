@@ -28,28 +28,54 @@ interface ScrapeResult {
 
 // Extract funding amount from text (in millions)
 function extractFundingAmount(text: string): number | undefined {
-  const patterns = [
-    /\$(\d+(?:\.\d+)?)\s*(?:bn|billion)/gi,
-    /€(\d+(?:\.\d+)?)\s*(?:bn|billion)/gi,
-    /£(\d+(?:\.\d+)?)\s*(?:bn|billion)/gi,
-    /\$(\d+(?:\.\d+)?)\s*(?:m|million)/gi,
-    /€(\d+(?:\.\d+)?)\s*(?:m|million)/gi,
-    /£(\d+(?:\.\d+)?)\s*(?:m|million)/gi,
-  ];
-  
   let maxAmount = 0;
   
-  for (const pattern of patterns) {
-    const matches = text.matchAll(pattern);
-    for (const match of matches) {
+  // Billion patterns - match number followed by bn/billion
+  const billionPatterns = [
+    /[\$€£](\d+(?:[.,]\d+)?)\s*(?:bn|billion)/gi,
+    /(\d+(?:[.,]\d+)?)\s*(?:bn|billion)\s*(?:dollars|euros|pounds)/gi,
+  ];
+  
+  // Million patterns - match number followed by m/mn/million
+  const millionPatterns = [
+    /[\$€£](\d+(?:[.,]\d+)?)\s*(?:m|mn|million)/gi,
+    /(\d+(?:[.,]\d+)?)\s*(?:m|mn|million)\s*(?:dollars|euros|pounds)/gi,
+    /raised\s+[\$€£]?(\d+(?:[.,]\d+)?)\s*(?:m|mn|million)/gi,
+    /funding\s+(?:of\s+)?[\$€£]?(\d+(?:[.,]\d+)?)\s*(?:m|mn|million)/gi,
+    /series\s+[a-z]\s+(?:of\s+)?[\$€£]?(\d+(?:[.,]\d+)?)\s*(?:m|mn|million)/gi,
+  ];
+  
+  // Process billion patterns (convert to millions)
+  for (const pattern of billionPatterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const amount = parseFloat(match[1].replace(',', '.')) * 1000;
+      if (amount > maxAmount) maxAmount = amount;
+    }
+  }
+  
+  // Process million patterns
+  for (const pattern of millionPatterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const amount = parseFloat(match[1].replace(',', '.'));
+      if (amount > maxAmount) maxAmount = amount;
+    }
+  }
+  
+  // Also try to catch plain currency amounts like $50M or €100M
+  const shortPatterns = [
+    /[\$€£](\d+(?:\.\d+)?)[Mm]\b/g,
+    /[\$€£](\d+(?:\.\d+)?)[Bb]\b/g,
+  ];
+  
+  for (let i = 0; i < shortPatterns.length; i++) {
+    const pattern = shortPatterns[i];
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
       let amount = parseFloat(match[1]);
-      // Convert billions to millions
-      if (pattern.source.includes('billion') || pattern.source.includes('bn')) {
-        amount *= 1000;
-      }
-      if (amount > maxAmount) {
-        maxAmount = amount;
-      }
+      if (i === 1) amount *= 1000; // Billion pattern
+      if (amount > maxAmount) maxAmount = amount;
     }
   }
   

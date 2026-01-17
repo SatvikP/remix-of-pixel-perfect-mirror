@@ -28,12 +28,15 @@ interface ClusterResult {
   keywords: string[];
   articleCount: number;
   totalFunding: number;
-  avgRecency: number; // Days since scrape
+  avgRecency: number;
+  trendScore: number; // 0-100 score based on recency and article volume
 }
 
 interface StartupClusterMatch {
   startup: Startup;
   clusters: { clusterId: number; clusterName: string; score: number }[];
+  investmentScore: number; // 0-100 investment significance score
+  trendCorrelation: number; // How well matched to trending topics
 }
 
 Deno.serve(async (req) => {
@@ -72,42 +75,56 @@ Deno.serve(async (req) => {
 
     console.log(`Clustering ${scrapedArticles.length} articles into ${numClusters} clusters for ${startups.length} startups`);
 
-    // Step 1: Use AI to analyze articles and identify clusters using K-means-like grouping
+    // Calculate article metrics for trend analysis
+    const now = Date.now();
+    const articleMetrics = scrapedArticles.map((article, idx) => {
+      const recencyDays = (now - new Date(article.scrapedAt).getTime()) / (1000 * 60 * 60 * 24);
+      const recencyScore = Math.max(0, 100 - recencyDays * 10); // Decay over 10 days
+      return {
+        idx: idx + 1,
+        recencyDays,
+        recencyScore,
+        funding: article.fundingAmount || 0,
+      };
+    });
+
+    // Step 1: Use AI to analyze articles and identify clusters
     const articleSummaries = scrapedArticles.map((article, idx) => {
-      const recencyDays = Math.floor((Date.now() - new Date(article.scrapedAt).getTime()) / (1000 * 60 * 60 * 24));
-      const fundingInfo = article.fundingAmount ? ` (Funding: $${article.fundingAmount}M)` : '';
-      return `[${idx + 1}] "${article.title}"${fundingInfo} - ${article.excerpt}`;
+      const metrics = articleMetrics[idx];
+      const fundingInfo = article.fundingAmount ? ` [FUNDING: $${article.fundingAmount}M]` : '';
+      const recencyInfo = ` [${metrics.recencyDays.toFixed(1)} days ago]`;
+      return `[${idx + 1}] "${article.title}"${fundingInfo}${recencyInfo} - ${article.excerpt}`;
     }).join('\n');
 
-    const clusterPrompt = `You are analyzing startup/tech news articles to identify thematic clusters. 
-    
-Analyze these articles and group them into exactly ${numClusters} thematic clusters (like K-means clustering would do).
-Consider article importance based on:
-1. Funding amounts mentioned (higher = more important)
-2. Recency (more recent = more important)
+    const clusterPrompt = `Analyze these startup/tech news articles and identify ${numClusters} thematic trend clusters.
 
-Articles to analyze:
+Articles (with funding and recency info):
 ${articleSummaries}
 
-Return a JSON object with this exact structure:
+Create clusters based on industry themes. For each cluster, assess its "trendiness" based on:
+1. Article recency (more recent = trendier)
+2. Funding amounts (higher funding = hotter sector)
+3. Article volume (more articles = more attention)
+
+Return JSON:
 {
   "clusters": [
     {
       "id": 1,
-      "name": "Short name like 'AI Infrastructure' or 'Fintech Payments'",
-      "description": "2-3 sentence description of what this cluster covers",
+      "name": "Short 2-4 word name like 'AI Infrastructure'",
+      "description": "2-3 sentence description",
       "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"],
-      "articleIndices": [1, 5, 12]
+      "articleIndices": [1, 5, 12],
+      "trendScore": 85
     }
   ]
 }
 
 Rules:
-- Each article should be assigned to exactly ONE cluster
-- Cluster names should be concise (2-4 words)
-- Include 5-8 keywords per cluster that capture the theme
-- Consider funding amounts to weight cluster importance
-- Return ONLY valid JSON, no other text`;
+- Each article in exactly ONE cluster
+- trendScore: 0-100 based on recency + funding + volume
+- Include 5-8 relevant keywords
+- Return ONLY valid JSON`;
 
     console.log('Calling AI to identify clusters...');
     
@@ -120,7 +137,7 @@ Rules:
       body: JSON.stringify({
         model: 'google/gemini-3-flash-preview',
         messages: [
-          { role: 'system', content: 'You are an expert at analyzing startup and tech news to identify industry trends and thematic clusters. Always return valid JSON.' },
+          { role: 'system', content: 'You are an expert at analyzing startup and tech news to identify industry trends. Always return valid JSON.' },
           { role: 'user', content: clusterPrompt }
         ],
         temperature: 0.3,
@@ -156,9 +173,8 @@ Rules:
     console.log('AI cluster response received');
     
     // Parse cluster results
-    let parsedClusters: { clusters: { id: number; name: string; description: string; keywords: string[]; articleIndices: number[] }[] };
+    let parsedClusters: { clusters: { id: number; name: string; description: string; keywords: string[]; articleIndices: number[]; trendScore: number }[] };
     try {
-      // Extract JSON from response (handle markdown code blocks)
       let jsonStr = clusterContent;
       const jsonMatch = clusterContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (jsonMatch) {
@@ -173,11 +189,10 @@ Rules:
       );
     }
 
-    // Build cluster results with metadata
+    // Build cluster results with computed metadata
     const clusterResults: ClusterResult[] = parsedClusters.clusters.map(cluster => {
       const clusterArticles = cluster.articleIndices.map(idx => scrapedArticles[idx - 1]).filter(Boolean);
       const totalFunding = clusterArticles.reduce((sum, a) => sum + (a?.fundingAmount || 0), 0);
-      const now = Date.now();
       const avgRecency = clusterArticles.length > 0 
         ? clusterArticles.reduce((sum, a) => sum + (now - new Date(a.scrapedAt).getTime()) / (1000 * 60 * 60 * 24), 0) / clusterArticles.length
         : 0;
@@ -190,44 +205,57 @@ Rules:
         articleCount: clusterArticles.length,
         totalFunding,
         avgRecency: Math.round(avgRecency * 10) / 10,
+        trendScore: cluster.trendScore || 50,
       };
     });
 
-    // Step 2: Match startups to clusters
+    // Sort clusters by trend score for reference
+    const sortedClusters = [...clusterResults].sort((a, b) => b.trendScore - a.trendScore);
+
+    // Step 2: Match startups and calculate investment scores
     const startupData = startups.map((s, idx) => 
       `[${idx + 1}] ${s.name}${s.tags ? ` | Tags: ${s.tags}` : ''}${s.website ? ` | ${s.website}` : ''}`
     ).join('\n');
 
-    const clusterData2 = clusterResults.map(c => 
-      `Cluster ${c.id}: "${c.name}" - Keywords: ${c.keywords.join(', ')}`
+    const clusterInfo = sortedClusters.map(c => 
+      `Cluster ${c.id}: "${c.name}" (Trend: ${c.trendScore}/100, Funding: $${c.totalFunding}M) - Keywords: ${c.keywords.join(', ')}`
     ).join('\n');
 
-    const matchPrompt = `Match each startup to the most relevant cluster(s).
+    const matchPrompt = `Match startups to trend clusters and score their investment potential.
 
-CLUSTERS:
-${clusterData2}
+CLUSTERS (sorted by trend score):
+${clusterInfo}
 
 STARTUPS:
 ${startupData}
 
-Return a JSON object:
+For each startup, determine:
+1. Which clusters they match (based on name, tags, website)
+2. Match score per cluster (0-1)
+3. Investment significance score (0-100) based on:
+   - How well they align with HIGH-trend clusters
+   - Stronger alignment with trending topics = higher score
+   - Startups in hot sectors (high cluster trendScore) should rank higher
+
+Return JSON:
 {
   "matches": [
     {
       "startupIndex": 1,
       "clusters": [
-        { "clusterId": 1, "score": 0.85 },
-        { "clusterId": 3, "score": 0.45 }
-      ]
+        { "clusterId": 1, "score": 0.85 }
+      ],
+      "investmentScore": 78,
+      "trendCorrelation": 0.82
     }
   ]
 }
 
 Rules:
-- Match based on startup name, tags, and website domain
-- Score from 0 to 1 (1 = perfect match)
-- Include up to 3 clusters per startup if relevant
-- Only include matches with score > 0.3
+- investmentScore: 0-100, weighted by cluster trend scores
+- trendCorrelation: 0-1, how well startup aligns with trending topics
+- Up to 3 clusters per startup, score > 0.3
+- Startups matching high-trend clusters get higher investmentScore
 - Return ONLY valid JSON`;
 
     console.log('Calling AI to match startups to clusters...');
@@ -241,7 +269,7 @@ Rules:
       body: JSON.stringify({
         model: 'google/gemini-3-flash-preview',
         messages: [
-          { role: 'system', content: 'You are an expert at matching startups to industry clusters. Always return valid JSON.' },
+          { role: 'system', content: 'You are an expert at evaluating startup investment potential based on market trends. Always return valid JSON.' },
           { role: 'user', content: matchPrompt }
         ],
         temperature: 0.2,
@@ -259,7 +287,7 @@ Rules:
     const matchData = await matchResponse.json();
     const matchContent = matchData.choices?.[0]?.message?.content || '';
 
-    let parsedMatches: { matches: { startupIndex: number; clusters: { clusterId: number; score: number }[] }[] };
+    let parsedMatches: { matches: { startupIndex: number; clusters: { clusterId: number; score: number }[]; investmentScore: number; trendCorrelation: number }[] };
     try {
       let jsonStr = matchContent;
       const jsonMatch = matchContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -285,19 +313,26 @@ Rules:
           clusterName: clusterResults.find(cr => cr.id === c.clusterId)?.name || 'Unknown',
           score: c.score,
         })).sort((a, b) => b.score - a.score),
+        investmentScore: match.investmentScore || 0,
+        trendCorrelation: match.trendCorrelation || 0,
       };
     });
 
-    // Include startups that weren't matched
+    // Include startups that weren't matched with zero scores
     const matchedIndices = new Set(parsedMatches.matches.map(m => m.startupIndex));
     startups.forEach((startup, idx) => {
       if (!matchedIndices.has(idx + 1)) {
         startupMatches.push({
           startup,
           clusters: [],
+          investmentScore: 0,
+          trendCorrelation: 0,
         });
       }
     });
+
+    // Sort by investment score (highest first)
+    startupMatches.sort((a, b) => b.investmentScore - a.investmentScore);
 
     console.log(`Clustering complete: ${clusterResults.length} clusters, ${startupMatches.length} startups matched`);
 

@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ClusterBadge } from './ClusterBadge';
 import type { ClusterResult } from '@/lib/types';
-import { DollarSign, FileText, Clock } from 'lucide-react';
+import { DollarSign, FileText, Clock, TrendingUp } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 interface ClusterOverviewProps {
   clusters: ClusterResult[];
@@ -10,11 +11,17 @@ interface ClusterOverviewProps {
 }
 
 export function ClusterOverview({ clusters, activeCluster, onClusterClick }: ClusterOverviewProps) {
+  // Sort clusters by trend score
+  const sortedClusters = [...clusters].sort((a, b) => b.trendScore - a.trendScore);
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center justify-between">
-          <span>Discovered Clusters</span>
+          <span className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Trend Clusters
+          </span>
           {activeCluster !== null && (
             <button
               onClick={() => onClusterClick(null)}
@@ -27,7 +34,7 @@ export function ClusterOverview({ clusters, activeCluster, onClusterClick }: Clu
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {clusters.map((cluster) => (
+          {sortedClusters.map((cluster, idx) => (
             <div
               key={cluster.id}
               className={`p-3 rounded-lg border transition-all cursor-pointer ${
@@ -38,13 +45,33 @@ export function ClusterOverview({ clusters, activeCluster, onClusterClick }: Clu
               onClick={() => onClusterClick(activeCluster === cluster.id ? null : cluster.id)}
             >
               <div className="flex items-start justify-between mb-2">
-                <ClusterBadge
-                  clusterId={cluster.id}
-                  name={cluster.name}
-                  isActive={activeCluster === cluster.id}
-                  size="lg"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-muted-foreground">#{idx + 1}</span>
+                  <ClusterBadge
+                    clusterId={cluster.id}
+                    name={cluster.name}
+                    isActive={activeCluster === cluster.id}
+                    size="lg"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground">Trend:</span>
+                  <span className={`font-semibold ${
+                    cluster.trendScore >= 70 ? 'text-red-500' :
+                    cluster.trendScore >= 50 ? 'text-orange-500' :
+                    cluster.trendScore >= 30 ? 'text-yellow-600' :
+                    'text-muted-foreground'
+                  }`}>
+                    {cluster.trendScore}
+                  </span>
+                </div>
               </div>
+              
+              <Progress 
+                value={cluster.trendScore} 
+                className="h-1.5 mb-2"
+              />
+              
               <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                 {cluster.description}
               </p>
@@ -56,7 +83,7 @@ export function ClusterOverview({ clusters, activeCluster, onClusterClick }: Clu
                 {cluster.totalFunding > 0 && (
                   <span className="flex items-center gap-1">
                     <DollarSign className="h-3.5 w-3.5" />
-                    ${cluster.totalFunding}M raised
+                    ${cluster.totalFunding.toFixed(1)}M raised
                   </span>
                 )}
                 <span className="flex items-center gap-1">
@@ -65,9 +92,9 @@ export function ClusterOverview({ clusters, activeCluster, onClusterClick }: Clu
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-3">
-                {cluster.keywords.slice(0, 5).map((keyword, idx) => (
+                {cluster.keywords.slice(0, 5).map((keyword, kidx) => (
                   <span
-                    key={idx}
+                    key={kidx}
                     className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
                   >
                     {keyword}
