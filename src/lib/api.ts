@@ -43,11 +43,16 @@ export function parseCSV(csvText: string): Startup[] {
 
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
   
-  // Find column indices
+  // Find column indices - extended fields
   const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('startup'));
   const websiteIdx = headers.findIndex(h => h.includes('website') || h.includes('url') || h.includes('site'));
   const tagsIdx = headers.findIndex(h => h.includes('tag') || h.includes('category') || h.includes('sector'));
   const linkedinIdx = headers.findIndex(h => h.includes('linkedin'));
+  const blurbIdx = headers.findIndex(h => h.includes('blurb') || h.includes('description') || h.includes('about'));
+  const locationIdx = headers.findIndex(h => h.includes('location') || h.includes('country') || h.includes('city') || h.includes('hq'));
+  const maturityIdx = headers.findIndex(h => h.includes('maturity') || h.includes('stage') || h.includes('round'));
+  const amountIdx = headers.findIndex(h => h.includes('amount') || h.includes('raised') || h.includes('funding'));
+  const typeIdx = headers.findIndex(h => h.includes('type') || h.includes('business'));
 
   if (nameIdx === -1) {
     throw new Error('CSV must have a "Name" or "Startup Name" column');
@@ -59,7 +64,6 @@ export function parseCSV(csvText: string): Startup[] {
     const line = lines[i].trim();
     if (!line) continue;
 
-    // Handle quoted values with commas
     const values: string[] = [];
     let current = '';
     let inQuotes = false;
@@ -79,11 +83,42 @@ export function parseCSV(csvText: string): Startup[] {
     const name = values[nameIdx]?.trim();
     if (!name) continue;
 
+    // Parse maturity stage
+    const maturityRaw = maturityIdx >= 0 ? values[maturityIdx]?.trim().toLowerCase() : undefined;
+    let maturity: Startup['maturity'] = undefined;
+    if (maturityRaw) {
+      if (maturityRaw.includes('pre-seed') || maturityRaw.includes('preseed')) maturity = 'pre-seed';
+      else if (maturityRaw.includes('seed')) maturity = 'seed';
+      else if (maturityRaw.includes('series a') || maturityRaw.includes('series-a')) maturity = 'series-a';
+      else if (maturityRaw.includes('series b') || maturityRaw.includes('series-b')) maturity = 'series-b';
+      else if (maturityRaw.includes('series c') || maturityRaw.includes('series-c') || maturityRaw.includes('late')) maturity = 'series-c+';
+      else if (maturityRaw.includes('growth')) maturity = 'growth';
+    }
+
+    // Parse business type
+    const typeRaw = typeIdx >= 0 ? values[typeIdx]?.trim().toLowerCase() : undefined;
+    let businessType: Startup['businessType'] = undefined;
+    if (typeRaw) {
+      if (typeRaw.includes('saas') || typeRaw.includes('software')) businessType = 'saas';
+      else if (typeRaw.includes('biotech') || typeRaw.includes('health')) businessType = 'biotech';
+      else if (typeRaw.includes('hardware') || typeRaw.includes('robot')) businessType = 'hardware';
+      else if (typeRaw.includes('food') || typeRaw.includes('agri')) businessType = 'food';
+      else if (typeRaw.includes('fintech') || typeRaw.includes('finance')) businessType = 'fintech';
+      else if (typeRaw.includes('marketplace')) businessType = 'marketplace';
+      else if (typeRaw.includes('deep') || typeRaw.includes('quantum')) businessType = 'deeptech';
+      else businessType = 'other';
+    }
+
     startups.push({
       name,
       website: websiteIdx >= 0 ? values[websiteIdx]?.trim() : undefined,
       tags: tagsIdx >= 0 ? values[tagsIdx]?.trim() : undefined,
       linkedin: linkedinIdx >= 0 ? values[linkedinIdx]?.trim() : undefined,
+      blurb: blurbIdx >= 0 ? values[blurbIdx]?.trim() : undefined,
+      location: locationIdx >= 0 ? values[locationIdx]?.trim() : undefined,
+      maturity,
+      amountRaised: amountIdx >= 0 ? values[amountIdx]?.trim() : undefined,
+      businessType,
     });
   }
 
