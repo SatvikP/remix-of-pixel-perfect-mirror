@@ -63,7 +63,7 @@ export default function Index() {
         setStatusMessage(`Scraping ${siftedArticles.length} articles...`);
         
         const articles = siftedArticles as Article[];
-        const scrapeResult = await scrapeArticles(articles.slice(0, 30)); // Limit for speed
+        const scrapeResult = await scrapeArticles(articles); // Analyze all articles
         
         if (!scrapeResult.success) throw new Error(scrapeResult.error || 'Failed to scrape');
         articlesToUse = scrapeResult.data || [];
