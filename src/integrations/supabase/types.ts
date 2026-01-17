@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      articles: {
+        Row: {
+          authors: string[] | null
+          created_at: string
+          excerpt: string | null
+          id: string
+          is_pro: boolean | null
+          published_date: string | null
+          section: string | null
+          source: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          authors?: string[] | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_pro?: boolean | null
+          published_date?: string | null
+          section?: string | null
+          source: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          authors?: string[] | null
+          created_at?: string
+          excerpt?: string | null
+          id?: string
+          is_pro?: boolean | null
+          published_date?: string | null
+          section?: string | null
+          source?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
