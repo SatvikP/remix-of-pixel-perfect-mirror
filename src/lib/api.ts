@@ -17,7 +17,7 @@ export async function scrapeArticles(articles: Article[]): Promise<ScrapeResult>
 export async function clusterStartups(
   scrapedArticles: ScrapedArticle[],
   startups: Startup[],
-  numClusters: number = 6
+  numClusters: number = 10
 ): Promise<ClusteringResult> {
   const { data, error } = await supabase.functions.invoke('cluster-startups', {
     body: { scrapedArticles, startups, numClusters },

@@ -27,9 +27,7 @@ interface ClusterResult {
   description: string;
   keywords: string[];
   articleCount: number;
-  totalFunding: number;
-  avgRecency: number;
-  trendScore: number; // 0-100 score based on recency and article volume
+  trendScore: number; // 0-100 score based on momentum/volume signals in the articles
 }
 
 interface StartupClusterMatch {
@@ -75,28 +73,12 @@ Deno.serve(async (req) => {
 
     console.log(`Clustering ${scrapedArticles.length} articles into ${numClusters} clusters for ${startups.length} startups`);
 
-    // Calculate article metrics for trend analysis
-    const now = Date.now();
-    const articleMetrics = scrapedArticles.map((article, idx) => {
-      const recencyDays = (now - new Date(article.scrapedAt).getTime()) / (1000 * 60 * 60 * 24);
-      const recencyScore = Math.max(0, 100 - recencyDays * 10); // Decay over 10 days
-      return {
-        idx: idx + 1,
-        recencyDays,
-        recencyScore,
-        funding: article.fundingAmount || 0,
-      };
-    });
-
     // Step 1: Use AI to analyze articles and identify clusters
     const articleSummaries = scrapedArticles.map((article, idx) => {
-      const metrics = articleMetrics[idx];
-      const fundingInfo = article.fundingAmount ? ` [FUNDING: $${article.fundingAmount}M]` : '';
-      const recencyInfo = ` [${metrics.recencyDays.toFixed(1)} days ago]`;
-      return `[${idx + 1}] "${article.title}"${fundingInfo}${recencyInfo} - ${article.excerpt}`;
+      return `[${idx + 1}] "${article.title}" - ${article.excerpt}`;
     }).join('\n');
 
-const clusterPrompt = `Analyze these startup/tech news articles and identify ${numClusters} SPECIFIC and GRANULAR trend clusters.
+    const clusterPrompt = `Analyze these startup/tech news articles and identify ${numClusters} SPECIFIC and GRANULAR trend clusters.
 
 Articles:
 ${articleSummaries}
@@ -125,7 +107,7 @@ Return JSON:
 Rules:
 - Be SPECIFIC and GRANULAR - avoid broad categories
 - Each article in exactly ONE cluster
-- trendScore: 0-100 based on recency + funding + volume
+- trendScore: 0-100 based on (a) how many articles are in the cluster and (b) how strongly the titles/excerpts signal momentum and novelty
 - Include 6-10 specific keywords per cluster
 - Return ONLY valid JSON`;
 
@@ -193,21 +175,17 @@ Rules:
     }
 
     // Build cluster results with computed metadata
-    const clusterResults: ClusterResult[] = parsedClusters.clusters.map(cluster => {
-      const clusterArticles = cluster.articleIndices.map(idx => scrapedArticles[idx - 1]).filter(Boolean);
-      const totalFunding = clusterArticles.reduce((sum, a) => sum + (a?.fundingAmount || 0), 0);
-      const avgRecency = clusterArticles.length > 0 
-        ? clusterArticles.reduce((sum, a) => sum + (now - new Date(a.scrapedAt).getTime()) / (1000 * 60 * 60 * 24), 0) / clusterArticles.length
-        : 0;
-      
+    const clusterResults: ClusterResult[] = parsedClusters.clusters.map((cluster) => {
+      const clusterArticles = cluster.articleIndices
+        .map((idx) => scrapedArticles[idx - 1])
+        .filter((a): a is ScrapedArticle => Boolean(a));
+
       return {
         id: cluster.id,
         name: cluster.name,
         description: cluster.description,
         keywords: cluster.keywords,
         articleCount: clusterArticles.length,
-        totalFunding,
-        avgRecency: Math.round(avgRecency * 10) / 10,
         trendScore: cluster.trendScore || 50,
       };
     });
@@ -221,7 +199,7 @@ Rules:
     ).join('\n');
 
     const clusterInfo = sortedClusters.map(c => 
-      `Cluster ${c.id}: "${c.name}" (Trend: ${c.trendScore}/100, Funding: $${c.totalFunding}M) - Keywords: ${c.keywords.join(', ')}`
+      `Cluster ${c.id}: "${c.name}" (Trend: ${c.trendScore}/100) - Keywords: ${c.keywords.join(', ')}`
     ).join('\n');
 
     const matchPrompt = `Match startups to trend clusters and score their investment potential.

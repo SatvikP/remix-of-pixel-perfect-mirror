@@ -17,12 +17,18 @@ interface StartupsTableProps {
   activeCluster: number | null;
 }
 
-function getInvestmentTier(score: number): { label: string; color: string; icon?: React.ReactNode } {
-  if (score >= 80) return { label: 'Hot', color: 'bg-red-500/10 text-red-600 border-red-200', icon: <Flame className="h-3 w-3" /> };
-  if (score >= 60) return { label: 'Strong', color: 'bg-orange-500/10 text-orange-600 border-orange-200' };
-  if (score >= 40) return { label: 'Moderate', color: 'bg-yellow-500/10 text-yellow-600 border-yellow-200' };
-  if (score >= 20) return { label: 'Low', color: 'bg-slate-500/10 text-slate-600 border-slate-200' };
-  return { label: 'Minimal', color: 'bg-muted text-muted-foreground' };
+function getInvestmentTier(score: number): { label: string; className: string; icon?: React.ReactNode } {
+  if (score >= 80) {
+    return {
+      label: 'Hot',
+      className: 'bg-destructive/10 text-destructive border-destructive/20',
+      icon: <Flame className="h-3 w-3" />,
+    };
+  }
+  if (score >= 60) return { label: 'Strong', className: 'bg-primary/10 text-primary border-primary/20' };
+  if (score >= 40) return { label: 'Moderate', className: 'bg-secondary text-secondary-foreground border-border' };
+  if (score >= 20) return { label: 'Low', className: 'bg-muted text-muted-foreground border-border' };
+  return { label: 'Minimal', className: 'bg-muted text-muted-foreground border-border' };
 }
 
 export function StartupsTable({ startupMatches, activeCluster }: StartupsTableProps) {
@@ -71,7 +77,7 @@ export function StartupsTable({ startupMatches, activeCluster }: StartupsTablePr
                     </TableCell>
                     <TableCell className="font-medium">{match.startup.name}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`gap-1 ${tier.color}`}>
+                      <Badge variant="outline" className={`gap-1 ${tier.className}`}>
                         {tier.icon}
                         {match.investmentScore}/100
                       </Badge>
