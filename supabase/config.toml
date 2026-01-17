@@ -1,1 +1,7 @@
 project_id = "vnpyzhvzkkzwhbsypkej"
+
+[functions.scrape-articles]
+verify_jwt = false
+
+[functions.cluster-startups]
+verify_jwt = false
