@@ -34,11 +34,14 @@ export interface ClusterResult {
   articleCount: number;
   totalFunding: number;
   avgRecency: number;
+  trendScore: number;
 }
 
 export interface StartupClusterMatch {
   startup: Startup;
   clusters: { clusterId: number; clusterName: string; score: number }[];
+  investmentScore: number;
+  trendCorrelation: number;
 }
 
 export interface ClusteringResult {
