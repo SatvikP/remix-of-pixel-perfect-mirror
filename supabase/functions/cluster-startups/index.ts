@@ -19,7 +19,18 @@ interface Startup {
   website?: string;
   tags?: string;
   linkedin?: string;
+  blurb?: string;
+  location?: string;
+  maturity?: string;
+  amountRaised?: string;
+  businessType?: string;
+  team?: string;
+  market?: string;
+  valueProp?: string;
+  competition?: string;
 }
+
+type ParentCategory = 'biotech' | 'saas' | 'hardware' | 'food' | 'fintech' | 'marketplace' | 'deeptech' | 'climate' | 'other';
 
 interface ClusterResult {
   id: number;
@@ -27,15 +38,34 @@ interface ClusterResult {
   description: string;
   keywords: string[];
   articleCount: number;
-  trendScore: number; // 0-100 score based on momentum/volume signals in the articles
+  trendScore: number;
+  parentCategory: ParentCategory;
 }
 
 interface StartupClusterMatch {
   startup: Startup;
   clusters: { clusterId: number; clusterName: string; score: number }[];
-  investmentScore: number; // 0-100 investment significance score
-  trendCorrelation: number; // How well matched to trending topics
+  investmentScore: number;
+  trendCorrelation: number;
+  scoreBreakdown: {
+    trendAlignment: number;
+    marketTiming: number;
+    sectorFit: number;
+  };
 }
+
+// Scoring weights by business type
+const SCORING_WEIGHTS: Record<string, { trendAlignment: number; marketTiming: number; sectorFit: number }> = {
+  saas: { trendAlignment: 40, marketTiming: 35, sectorFit: 25 },
+  biotech: { trendAlignment: 25, marketTiming: 25, sectorFit: 50 },
+  hardware: { trendAlignment: 30, marketTiming: 30, sectorFit: 40 },
+  food: { trendAlignment: 35, marketTiming: 35, sectorFit: 30 },
+  fintech: { trendAlignment: 40, marketTiming: 30, sectorFit: 30 },
+  deeptech: { trendAlignment: 20, marketTiming: 30, sectorFit: 50 },
+  climate: { trendAlignment: 35, marketTiming: 40, sectorFit: 25 },
+  marketplace: { trendAlignment: 45, marketTiming: 35, sectorFit: 20 },
+  other: { trendAlignment: 35, marketTiming: 35, sectorFit: 30 },
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -43,7 +73,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { scrapedArticles, startups, numClusters = 10 } = await req.json() as {
+    const { scrapedArticles, startups, numClusters = 12 } = await req.json() as {
       scrapedArticles: ScrapedArticle[];
       startups: Startup[];
       numClusters?: number;
@@ -73,22 +103,32 @@ Deno.serve(async (req) => {
 
     console.log(`Clustering ${scrapedArticles.length} articles into ${numClusters} clusters for ${startups.length} startups`);
 
-    // Step 1: Use AI to analyze articles and identify clusters
+    // Step 1: Use AI to analyze articles and identify HIERARCHICAL clusters
     const articleSummaries = scrapedArticles.map((article, idx) => {
       return `[${idx + 1}] "${article.title}" - ${article.excerpt}`;
     }).join('\n');
 
-    const clusterPrompt = `Analyze these startup/tech news articles and identify ${numClusters} SPECIFIC and GRANULAR trend clusters.
+    const clusterPrompt = `Analyze these startup/tech news articles and identify ${numClusters} SPECIFIC trend clusters organized under parent categories.
 
 Articles:
 ${articleSummaries}
 
-Create SPECIFIC, NICHE clusters - not broad categories. Examples of good clusters:
-- "AI Code Assistants" NOT "Artificial Intelligence"
-- "Electric Vehicle Batteries" NOT "Clean Energy"
-- "Enterprise Security Automation" NOT "Cybersecurity"
-- "AI Drug Discovery" NOT "Healthcare Tech"
-- "Vertical SaaS for Construction" NOT "B2B Software"
+Parent categories (MUST use one of these):
+- biotech: Biotechnology, healthcare, pharma, medtech, life sciences
+- saas: B2B/B2C software, enterprise tools, AI/ML software
+- hardware: Physical products, IoT, robotics, manufacturing
+- food: FoodTech, AgriTech, alternative proteins, restaurants
+- fintech: Payments, banking, insurance, crypto, investments
+- marketplace: B2B/B2C marketplaces, e-commerce platforms
+- deeptech: Quantum computing, space tech, advanced materials, nuclear
+- climate: CleanTech, renewables, sustainability, carbon capture
+- other: Other emerging sectors
+
+Create SPECIFIC, NICHE clusters within these parent categories. Examples:
+- "AI Drug Discovery" (parent: biotech) NOT just "Healthcare"
+- "Vertical SaaS for Construction" (parent: saas) NOT just "B2B Software"
+- "Electric Vehicle Batteries" (parent: climate) NOT just "Clean Energy"
+- "AI Code Assistants" (parent: saas) NOT just "AI"
 
 Return JSON:
 {
@@ -96,8 +136,9 @@ Return JSON:
     {
       "id": 1,
       "name": "Specific 3-5 word niche like 'AI-Powered Legal Tech'",
+      "parentCategory": "saas",
       "description": "2-3 sentence description of this specific niche",
-      "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6", "keyword7", "keyword8"],
+      "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6"],
       "articleIndices": [1, 5, 12],
       "trendScore": 85
     }
@@ -106,12 +147,14 @@ Return JSON:
 
 Rules:
 - Be SPECIFIC and GRANULAR - avoid broad categories
+- Each cluster MUST have a valid parentCategory from the list above
 - Each article in exactly ONE cluster
-- trendScore: 0-100 based on (a) how many articles are in the cluster and (b) how strongly the titles/excerpts signal momentum and novelty
-- Include 6-10 specific keywords per cluster
+- trendScore: 0-100 based on article volume and momentum signals
+- Include 6-8 specific keywords per cluster
+- Aim for 2-4 clusters per active parent category
 - Return ONLY valid JSON`;
 
-    console.log('Calling AI to identify clusters...');
+    console.log('Calling AI to identify hierarchical clusters...');
     
     const clusterResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -158,7 +201,7 @@ Rules:
     console.log('AI cluster response received');
     
     // Parse cluster results
-    let parsedClusters: { clusters: { id: number; name: string; description: string; keywords: string[]; articleIndices: number[]; trendScore: number }[] };
+    let parsedClusters: { clusters: { id: number; name: string; parentCategory: ParentCategory; description: string; keywords: string[]; articleIndices: number[]; trendScore: number }[] };
     try {
       let jsonStr = clusterContent;
       const jsonMatch = clusterContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -174,7 +217,7 @@ Rules:
       );
     }
 
-    // Build cluster results with computed metadata
+    // Build cluster results with parent categories
     const clusterResults: ClusterResult[] = parsedClusters.clusters.map((cluster) => {
       const clusterArticles = cluster.articleIndices
         .map((idx) => scrapedArticles[idx - 1])
@@ -187,22 +230,23 @@ Rules:
         keywords: cluster.keywords,
         articleCount: clusterArticles.length,
         trendScore: cluster.trendScore || 50,
+        parentCategory: cluster.parentCategory || 'other',
       };
     });
 
-    // Sort clusters by trend score for reference
+    // Sort clusters by trend score
     const sortedClusters = [...clusterResults].sort((a, b) => b.trendScore - a.trendScore);
 
-    // Step 2: Match startups and calculate investment scores
+    // Step 2: Match startups and calculate detailed investment scores
     const startupData = startups.map((s, idx) => 
-      `[${idx + 1}] ${s.name}${s.tags ? ` | Tags: ${s.tags}` : ''}${s.website ? ` | ${s.website}` : ''}`
+      `[${idx + 1}] ${s.name}${s.tags ? ` | Tags: ${s.tags}` : ''}${s.website ? ` | ${s.website}` : ''}${s.businessType ? ` | Type: ${s.businessType}` : ''}${s.maturity ? ` | Stage: ${s.maturity}` : ''}`
     ).join('\n');
 
     const clusterInfo = sortedClusters.map(c => 
-      `Cluster ${c.id}: "${c.name}" (Trend: ${c.trendScore}/100) - Keywords: ${c.keywords.join(', ')}`
+      `Cluster ${c.id}: "${c.name}" (Category: ${c.parentCategory}, Trend: ${c.trendScore}/100) - Keywords: ${c.keywords.join(', ')}`
     ).join('\n');
 
-    const matchPrompt = `Match startups to trend clusters and score their investment potential.
+    const matchPrompt = `Match startups to trend clusters and calculate detailed investment scores with breakdown.
 
 CLUSTERS (sorted by trend score):
 ${clusterInfo}
@@ -210,13 +254,13 @@ ${clusterInfo}
 STARTUPS:
 ${startupData}
 
-For each startup, determine:
-1. Which clusters they match (based on name, tags, website)
+For each startup, calculate:
+1. Which clusters they match (based on name, tags, website, business type)
 2. Match score per cluster (0-1)
-3. Investment significance score (0-100) based on:
-   - How well they align with HIGH-trend clusters
-   - Stronger alignment with trending topics = higher score
-   - Startups in hot sectors (high cluster trendScore) should rank higher
+3. Investment score breakdown:
+   - trendAlignment (0-40): How well they align with HIGH-trend clusters
+   - marketTiming (0-30): Is the market ready? Are they positioned well?
+   - sectorFit (0-30): How well does their sector match trending areas?
 
 Return JSON:
 {
@@ -226,20 +270,26 @@ Return JSON:
       "clusters": [
         { "clusterId": 1, "score": 0.85 }
       ],
-      "investmentScore": 78,
+      "scoreBreakdown": {
+        "trendAlignment": 32,
+        "marketTiming": 25,
+        "sectorFit": 21
+      },
       "trendCorrelation": 0.82
     }
   ]
 }
 
 Rules:
-- investmentScore: 0-100, weighted by cluster trend scores
-- trendCorrelation: 0-1, how well startup aligns with trending topics
+- trendAlignment: 0-40, based on cluster trend scores
+- marketTiming: 0-30, based on market signals
+- sectorFit: 0-30, how well startup fits trending sectors
+- Total investmentScore = trendAlignment + marketTiming + sectorFit (0-100)
+- trendCorrelation: 0-1, overall trend alignment
 - Up to 3 clusters per startup, score > 0.3
-- Startups matching high-trend clusters get higher investmentScore
 - Return ONLY valid JSON`;
 
-    console.log('Calling AI to match startups to clusters...');
+    console.log('Calling AI to match startups with score breakdowns...');
 
     const matchResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -268,7 +318,7 @@ Rules:
     const matchData = await matchResponse.json();
     const matchContent = matchData.choices?.[0]?.message?.content || '';
 
-    let parsedMatches: { matches: { startupIndex: number; clusters: { clusterId: number; score: number }[]; investmentScore: number; trendCorrelation: number }[] };
+    let parsedMatches: { matches: { startupIndex: number; clusters: { clusterId: number; score: number }[]; scoreBreakdown: { trendAlignment: number; marketTiming: number; sectorFit: number }; trendCorrelation: number }[] };
     try {
       let jsonStr = matchContent;
       const jsonMatch = matchContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -284,9 +334,12 @@ Rules:
       );
     }
 
-    // Build final startup cluster matches
+    // Build final startup cluster matches with score breakdowns
     const startupMatches: StartupClusterMatch[] = parsedMatches.matches.map(match => {
       const startup = startups[match.startupIndex - 1];
+      const scoreBreakdown = match.scoreBreakdown || { trendAlignment: 0, marketTiming: 0, sectorFit: 0 };
+      const investmentScore = scoreBreakdown.trendAlignment + scoreBreakdown.marketTiming + scoreBreakdown.sectorFit;
+      
       return {
         startup,
         clusters: match.clusters.map(c => ({
@@ -294,8 +347,9 @@ Rules:
           clusterName: clusterResults.find(cr => cr.id === c.clusterId)?.name || 'Unknown',
           score: c.score,
         })).sort((a, b) => b.score - a.score),
-        investmentScore: match.investmentScore || 0,
+        investmentScore,
         trendCorrelation: match.trendCorrelation || 0,
+        scoreBreakdown,
       };
     });
 
@@ -308,6 +362,7 @@ Rules:
           clusters: [],
           investmentScore: 0,
           trendCorrelation: 0,
+          scoreBreakdown: { trendAlignment: 0, marketTiming: 0, sectorFit: 0 },
         });
       }
     });
@@ -315,7 +370,7 @@ Rules:
     // Sort by investment score (highest first)
     startupMatches.sort((a, b) => b.investmentScore - a.investmentScore);
 
-    console.log(`Clustering complete: ${clusterResults.length} clusters, ${startupMatches.length} startups matched`);
+    console.log(`Clustering complete: ${clusterResults.length} clusters in categories, ${startupMatches.length} startups matched`);
 
     return new Response(
       JSON.stringify({

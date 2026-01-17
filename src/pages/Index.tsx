@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { FileUploader } from '@/components/FileUploader';
-import { ClusterOverview } from '@/components/ClusterOverview';
-import { StartupsTable } from '@/components/StartupsTable';
+import { HierarchicalClusters } from '@/components/HierarchicalClusters';
+import { EnhancedStartupsTable } from '@/components/EnhancedStartupsTable';
 import { ProcessingStatus, ProcessingStep } from '@/components/ProcessingStatus';
 import { StatsCards } from '@/components/StatsCards';
 import { clusterStartups, parseCSV } from '@/lib/api';
@@ -54,8 +54,7 @@ export default function Index() {
         return;
       }
 
-      // Convert articles to scraped format directly (no need to call Firecrawl)
-      // The JSON already has title + excerpt which is enough for AI clustering
+      // Convert articles to scraped format directly
       const articles = siftedArticles as Article[];
       console.log(`Using ${articles.length} articles from JSON for analysis`);
       setProcessingStep('scraping');
@@ -67,20 +66,20 @@ export default function Index() {
         url: article.url,
         title: article.title,
         excerpt: article.excerpt,
-        content: `${article.title}. ${article.excerpt}`, // Use title+excerpt as content
+        content: `${article.title}. ${article.excerpt}`,
         scrapedAt: new Date().toISOString(),
       }));
 
       setProcessingStep('clustering');
       setProgress(50);
-      setStatusMessage(`Clustering ${startups.length} startups...`);
+      setStatusMessage(`Clustering ${startups.length} startups into hierarchical sectors...`);
 
-      const clusterResult = await clusterStartups(articlesToUse, startups, 10);
+      const clusterResult = await clusterStartups(articlesToUse, startups, 12);
       if (!clusterResult.success) throw new Error(clusterResult.error || 'Failed to cluster');
 
       setResult(clusterResult);
       setProcessingStep('complete');
-      toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters.` });
+      toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters across sectors.` });
     } catch (err) {
       setProcessingStep('error');
       setError(err instanceof Error ? err.message : 'Error occurred');
@@ -106,7 +105,7 @@ export default function Index() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">Startup Clustering Tool</h1>
-              <p className="text-sm text-muted-foreground">AI-powered K-means clustering</p>
+              <p className="text-sm text-muted-foreground">AI-powered hierarchical trend analysis</p>
             </div>
           </div>
         </div>
@@ -117,7 +116,7 @@ export default function Index() {
           <div className="max-w-xl mx-auto space-y-6">
             <div className="text-center mb-8">
               <h2 className="text-xl font-semibold mb-2">Upload Your Startups</h2>
-              <p className="text-muted-foreground">CSV with columns: Name, Website, Tags</p>
+              <p className="text-muted-foreground">CSV with columns: Name, Website, Tags, Location, Stage, Business Type</p>
             </div>
             <FileUploader onFileSelect={handleFileSelect} selectedFile={csvFile} onClear={handleClearFile} />
             {processingStep !== 'idle' && (
@@ -139,10 +138,10 @@ export default function Index() {
             <StatsCards stats={result.stats} />
             <div className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-1">
-                <ClusterOverview clusters={result.clusters} activeCluster={activeCluster} onClusterClick={setActiveCluster} />
+                <HierarchicalClusters clusters={result.clusters} activeCluster={activeCluster} onClusterClick={setActiveCluster} />
               </div>
               <div className="lg:col-span-2">
-                <StartupsTable startupMatches={result.startupMatches} activeCluster={activeCluster} />
+                <EnhancedStartupsTable startupMatches={result.startupMatches} activeCluster={activeCluster} />
               </div>
             </div>
           </div>
