@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ClusterBadge } from './ClusterBadge';
 import type { ClusterResult } from '@/lib/types';
-import { DollarSign, FileText, Clock, TrendingUp } from 'lucide-react';
+import { FileText, TrendingUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 
 interface ClusterOverviewProps {
@@ -57,9 +57,8 @@ export function ClusterOverview({ clusters, activeCluster, onClusterClick }: Clu
                 <div className="flex items-center gap-1.5 text-xs">
                   <span className="text-muted-foreground">Trend:</span>
                   <span className={`font-semibold ${
-                    cluster.trendScore >= 70 ? 'text-red-500' :
-                    cluster.trendScore >= 50 ? 'text-orange-500' :
-                    cluster.trendScore >= 30 ? 'text-yellow-600' :
+                    cluster.trendScore >= 70 ? 'text-destructive' :
+                    cluster.trendScore >= 50 ? 'text-primary' :
                     'text-muted-foreground'
                   }`}>
                     {cluster.trendScore}
@@ -80,19 +79,9 @@ export function ClusterOverview({ clusters, activeCluster, onClusterClick }: Clu
                   <FileText className="h-3.5 w-3.5" />
                   {cluster.articleCount} articles
                 </span>
-                {cluster.totalFunding > 0 && (
-                  <span className="flex items-center gap-1">
-                    <DollarSign className="h-3.5 w-3.5" />
-                    ${cluster.totalFunding.toFixed(1)}M raised
-                  </span>
-                )}
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3.5 w-3.5" />
-                  ~{cluster.avgRecency}d ago
-                </span>
               </div>
               <div className="flex flex-wrap gap-1.5 mt-3">
-                {cluster.keywords.slice(0, 5).map((keyword, kidx) => (
+                {cluster.keywords.slice(0, 8).map((keyword, kidx) => (
                   <span
                     key={kidx}
                     className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground"

@@ -32,8 +32,6 @@ export interface ClusterResult {
   description: string;
   keywords: string[];
   articleCount: number;
-  totalFunding: number;
-  avgRecency: number;
   trendScore: number;
 }
 
