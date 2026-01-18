@@ -59,6 +59,54 @@ export type Database = {
         }
         Relationships: []
       }
+      user_startups: {
+        Row: {
+          amount_raised: string | null
+          blurb: string | null
+          business_type: string | null
+          created_at: string | null
+          id: string
+          linkedin: string | null
+          location: string | null
+          maturity: string | null
+          name: string
+          tags: string | null
+          updated_at: string | null
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          amount_raised?: string | null
+          blurb?: string | null
+          business_type?: string | null
+          created_at?: string | null
+          id?: string
+          linkedin?: string | null
+          location?: string | null
+          maturity?: string | null
+          name: string
+          tags?: string | null
+          updated_at?: string | null
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          amount_raised?: string | null
+          blurb?: string | null
+          business_type?: string | null
+          created_at?: string | null
+          id?: string
+          linkedin?: string | null
+          location?: string | null
+          maturity?: string | null
+          name?: string
+          tags?: string | null
+          updated_at?: string | null
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
