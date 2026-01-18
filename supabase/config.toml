@@ -8,6 +8,3 @@ verify_jwt = false
 
 [functions.scrape-sifted-daily]
 verify_jwt = false
-
-[functions.scrape-lightpanda]
-verify_jwt = false

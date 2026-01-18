@@ -1,8 +1,0 @@
-{
-  "imports": {
-    "puppeteer-core": "npm:puppeteer-core@23.11.1"
-  },
-  "compilerOptions": {
-    "lib": ["deno.window", "dom", "dom.iterable"]
-  }
-}
