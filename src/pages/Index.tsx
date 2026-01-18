@@ -10,6 +10,7 @@ import { StatsCards } from '@/components/StatsCards';
 import { AirtableWebhook, sendToAirtable } from '@/components/AirtableWebhook';
 import { ScoringConfigurator } from '@/components/ScoringConfigurator';
 import { ScoreAnalysis } from '@/components/ScoreAnalysis';
+import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
 import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, type ScoringConfig } from '@/lib/scoring-config';
@@ -38,6 +39,12 @@ export default function Index() {
   });
   const [parsedStartups, setParsedStartups] = useState<Startup[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(true);
+  
+  // Scraper provider state
+  const [scraperProvider, setScraperProvider] = useState<ScraperProvider>(() => {
+    const saved = localStorage.getItem('scraper_provider');
+    return (saved === 'lightpanda' ? 'lightpanda' : 'firecrawl') as ScraperProvider;
+  });
   
   // Scoring configuration state
   const [scoringConfig, setScoringConfig] = useState<ScoringConfig>(() => {
@@ -79,10 +86,13 @@ export default function Index() {
 
   const handleRefreshArticles = async () => {
     setIsRefreshing(true);
-    toast({ title: 'Refreshing articles...', description: 'This may take a few minutes as we scrape 7 sources.' });
+    toast({ 
+      title: 'Refreshing articles...', 
+      description: `Using ${scraperProvider === 'lightpanda' ? 'Lightpanda' : 'Firecrawl'}. This may take a few minutes.` 
+    });
     
     try {
-      const result = await triggerArticleScrape();
+      const result = await triggerArticleScrape(scraperProvider);
       
       if (result.success) {
         toast({ 
@@ -259,6 +269,12 @@ export default function Index() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Scraping Provider Settings */}
+            <ScrapeSettings
+              provider={scraperProvider}
+              onProviderChange={setScraperProvider}
+            />
 
             {/* Airtable Webhook Integration */}
             <AirtableWebhook 
