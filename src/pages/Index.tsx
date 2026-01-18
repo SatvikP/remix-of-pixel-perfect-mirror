@@ -13,11 +13,11 @@ import { StatsCards } from '@/components/StatsCards';
 import { ScoringConfigurator } from '@/components/ScoringConfigurator';
 import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
-import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups } from '@/lib/api';
+import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen, checkIsAdmin } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, type ScoringConfig } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -66,6 +66,7 @@ export default function Index() {
     return DEFAULT_SCORING_CONFIG;
   });
   const [selectedStartupIndex, setSelectedStartupIndex] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   
   // Save scoring config to localStorage
   const handleScoringConfigChange = useCallback((config: ScoringConfig) => {
@@ -121,12 +122,19 @@ export default function Index() {
     loadArticles();
   }, []);
 
-  // Fetch user's saved startups on mount and set initial view
+  // Fetch user's saved startups on mount, update last_seen, and check admin status
   useEffect(() => {
     async function loadSavedStartups() {
       if (!user) return;
       setIsLoadingStartups(true);
       try {
+        // Update last_seen_at
+        await updateLastSeen();
+        
+        // Check admin status
+        const adminStatus = await checkIsAdmin();
+        setIsAdmin(adminStatus);
+        
         const startups = await fetchUserStartups();
         setSavedStartups(startups);
         console.log(`Loaded ${startups.length} saved startups for user`);
@@ -342,6 +350,12 @@ export default function Index() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {isAdmin && (
+                <Button variant="outline" size="sm" onClick={() => navigate('/admin')}>
+                  <ShieldCheck className="h-4 w-4 mr-2" />
+                  Admin
+                </Button>
+              )}
               <span className="text-sm text-muted-foreground hidden sm:block">
                 {user?.email}
               </span>
