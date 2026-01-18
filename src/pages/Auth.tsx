@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Sparkles, Loader2 } from "lucide-react";
 import { z } from "zod";
@@ -26,7 +25,6 @@ const Auth = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
@@ -36,7 +34,6 @@ const Auth = () => {
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
@@ -69,7 +66,6 @@ const Auth = () => {
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate input
     const result = authSchema.safeParse({ email, password });
     if (!result.success) {
       toast({
@@ -131,22 +127,39 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-2">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        background: "radial-gradient(110% 85% at 55% 55%, rgba(107,99,204,0.95) 0%, rgba(23,21,93,0.92) 38%, rgba(5,4,20,1) 78%)"
+      }}
+    >
+      <div 
+        className="w-full max-w-md rounded-2xl p-8 backdrop-blur-xl"
+        style={{
+          background: "rgba(255, 255, 255, 0.08)",
+          border: "1px solid rgba(255, 255, 255, 0.18)",
+          boxShadow: "0 18px 60px rgba(5,4,20,0.4)"
+        }}
+      >
+        {/* Header */}
+        <div className="text-center space-y-2 mb-8">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <Sparkles className="h-8 w-8 text-primary" />
-            <CardTitle className="text-2xl font-bold">FundRadar</CardTitle>
+            <Sparkles className="h-8 w-8 text-white" />
+            <h1 className="text-2xl font-bold text-white">FundRadar</h1>
           </div>
-          <CardDescription>
+          <p style={{ color: "rgba(255,255,255,0.62)" }}>
             {isLogin ? "Sign in to your account" : "Create a new account"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
+          </p>
+        </div>
+
+        <div className="space-y-6">
           {/* Google Sign In */}
           <Button
             variant="outline"
-            className="w-full h-12 text-base font-medium"
+            className="w-full h-12 text-base font-medium rounded-full bg-transparent text-white hover:bg-white/10 transition-colors"
+            style={{
+              border: "1px solid rgba(255,255,255,0.18)"
+            }}
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
           >
@@ -178,10 +191,16 @@ const Auth = () => {
           {/* Divider */}
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+              <span className="w-full" style={{ borderTop: "1px solid rgba(255,255,255,0.18)" }} />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">
+              <span 
+                className="px-2 text-xs"
+                style={{ 
+                  backgroundColor: "rgba(23,21,93,0.5)",
+                  color: "rgba(255,255,255,0.62)"
+                }}
+              >
                 Or continue with email
               </span>
             </div>
@@ -190,7 +209,7 @@ const Auth = () => {
           {/* Email/Password Form */}
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-white">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -198,10 +217,15 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="h-11 rounded-xl text-white placeholder:text-white/40 focus:ring-2 focus:ring-offset-0"
+                style={{
+                  backgroundColor: "rgba(5,4,20,0.4)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-white">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -209,9 +233,22 @@ const Auth = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="h-11 rounded-xl text-white placeholder:text-white/40 focus:ring-2 focus:ring-offset-0"
+                style={{
+                  backgroundColor: "rgba(5,4,20,0.4)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                }}
               />
             </div>
-            <Button type="submit" className="w-full h-11" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full h-11 rounded-full font-medium text-base transition-all hover:opacity-90"
+              style={{
+                backgroundColor: "#FFFFFF",
+                color: "#050414"
+              }}
+              disabled={loading}
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isLogin ? "Sign In" : "Create Account"}
             </Button>
@@ -219,19 +256,20 @@ const Auth = () => {
 
           {/* Toggle Mode */}
           <div className="text-center text-sm">
-            <span className="text-muted-foreground">
+            <span style={{ color: "rgba(255,255,255,0.62)" }}>
               {isLogin ? "Don't have an account? " : "Already have an account? "}
             </span>
             <button
               type="button"
-              className="text-primary hover:underline font-medium"
+              className="font-medium hover:underline transition-colors"
+              style={{ color: "#A49FE0" }}
               onClick={() => setIsLogin(!isLogin)}
             >
               {isLogin ? "Sign up" : "Sign in"}
             </button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };
