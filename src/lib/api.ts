@@ -73,7 +73,97 @@ export async function saveUserStartups(startups: Startup[]): Promise<boolean> {
     return false;
   }
 
+  // Update user profile to track CSV upload
+  await updateProfileCsvUpload();
+
   return true;
+}
+
+// Update user profile when CSV is uploaded
+async function updateProfileCsvUpload(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // Check if profile exists
+  const { data: existingProfile } = await supabase
+    .from('user_profiles')
+    .select('id, has_uploaded_csv, total_csv_uploads')
+    .eq('user_id', user.id)
+    .single();
+
+  if (existingProfile) {
+    // Update existing profile
+    await supabase
+      .from('user_profiles')
+      .update({
+        has_uploaded_csv: true,
+        first_csv_upload_at: existingProfile.has_uploaded_csv ? undefined : new Date().toISOString(),
+        total_csv_uploads: (existingProfile.total_csv_uploads || 0) + 1,
+        last_seen_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id);
+  } else {
+    // Insert new profile (should have been created by trigger, but fallback)
+    await supabase
+      .from('user_profiles')
+      .insert({
+        user_id: user.id,
+        email: user.email,
+        has_uploaded_csv: true,
+        first_csv_upload_at: new Date().toISOString(),
+        total_csv_uploads: 1,
+      });
+  }
+}
+
+// Update last_seen_at for current user
+export async function updateLastSeen(): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase
+    .from('user_profiles')
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq('user_id', user.id);
+}
+
+// Check if current user is an admin
+export async function checkIsAdmin(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('role', 'admin')
+    .single();
+
+  return !!data;
+}
+
+// Fetch all user profiles (admin only)
+export async function fetchAllUserProfiles(): Promise<{
+  id: string;
+  user_id: string;
+  email: string | null;
+  has_uploaded_csv: boolean;
+  first_csv_upload_at: string | null;
+  total_csv_uploads: number;
+  created_at: string;
+  last_seen_at: string;
+}[]> {
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching user profiles:', error);
+    return [];
+  }
+
+  return data || [];
 }
 
 // Delete all startups for current user
