@@ -1,60 +1,58 @@
 
 
-## Authentication System Plan
+## Auth Page Redesign with Oxaley-like Design System
 
-I'll build a clean, professional login page with Google OAuth and email/password signup that matches your current app design.
+I'll transform the login page to use the elegant dark-to-indigo gradient background with the sophisticated color palette you've provided.
 
-### Overview
+### Design Changes Overview
 
-The login page will feature:
-- **Google Sign-in button** (primary option, prominent placement)
-- **Email/Password signup** (secondary option with form)
-- **Toggle between Login and Sign Up modes**
-- **Clean, centered card design** matching your existing UI patterns
+**Background Transformation:**
+- Replace the plain `bg-background` with the hero gradient: `radial-gradient` from deep ink (#050414) through indigo (#17155D) to periwinkle (#6B63CC)
+- Add subtle glow effect for depth
+
+**Card Styling:**
+- Semi-transparent white card with blur backdrop for glassmorphism effect
+- Subtle border using `rgba(255,255,255,0.18)` for on-dark surfaces
+- Increased border radius to `lg` (16px) per the design system
+
+**Color Updates:**
+- Primary text on dark: `#FFFFFF`
+- Secondary text on dark: `rgba(255,255,255,0.62)`
+- Keep the existing font family (Inter) as requested
+
+**Button Styling:**
+- Google button: Ghost style with transparent background and white border
+- Submit button: Solid white background with dark text (primary button style)
+- Pill-shaped buttons with `rounded-full`
+
+**Form Elements:**
+- Input fields with dark backgrounds and light text
+- Subtle borders matching the design system
+- Focus ring using the periwinkle color
 
 ### Implementation Steps
 
-#### 1. Create Auth Page (`src/pages/Auth.tsx`)
-- Build a centered card layout with your app branding (Sparkles icon + title)
-- Add Google OAuth button (styled prominently)
-- Add a divider with "or continue with email"
-- Email/password form with validation using zod
-- Toggle between "Sign In" and "Sign Up" modes
-- Error handling with toast notifications
-- Automatic redirect to "/" when authenticated
+1. **Update Auth.tsx styling:**
+   - Apply gradient background to the page container
+   - Restyle the Card with glassmorphism (backdrop blur, semi-transparent)
+   - Update text colors to use on-dark palette
+   - Restyle buttons to match the design system
+   - Update input fields for dark theme
+   - Add subtle animations for hover states
 
-#### 2. Update App Router (`src/App.tsx`)
-- Add `/auth` route for the new authentication page
+2. **CSS Variables (optional):**
+   - Could add custom CSS variables for the design tokens if we want reusability
 
-#### 3. Protect Index Page (`src/pages/Index.tsx`)
-- Add authentication check on mount
-- Redirect unauthenticated users to `/auth`
-- Add user session state management
-- Add logout button in the header
-- Display user email in the header
+### Visual Result
 
-#### 4. Enable Auto-Confirm for Email Signups
-- Configure auth settings to auto-confirm email signups for easier testing
-
-### UI Design
-
-The auth page will feature:
-- **Header**: App logo + "Startup Clustering Tool" title
-- **Google button**: Full-width, dark background, Google icon
-- **Divider**: "or continue with email"
-- **Form fields**: Email input + Password input
-- **Submit button**: "Sign In" / "Create Account" depending on mode
-- **Mode toggle**: "Don't have an account? Sign up" link
-
-### Security Considerations
-- Input validation with zod for email format and password requirements
-- Proper error handling without exposing sensitive details
-- Session persistence using Supabase auth
-- `emailRedirectTo` configured for signup flow
+The login page will feature:
+- Deep indigo-to-black gradient background with subtle glow
+- Floating glass-like card with blur effect
+- Crisp white text and labels
+- Elegant pill-shaped buttons
+- Professional, modern SaaS aesthetic matching the Oxaley reference
 
 ### Critical Files for Implementation
-- `src/pages/Auth.tsx` - New authentication page (to be created)
-- `src/pages/Index.tsx` - Add auth check and logout functionality
-- `src/App.tsx` - Add /auth route
-- `src/integrations/supabase/client.ts` - Already configured Supabase client
+- `src/pages/Auth.tsx` - Main styling changes for the login page
+- `src/index.css` - Optional: Add custom CSS variables for the design tokens
 
