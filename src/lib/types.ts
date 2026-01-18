@@ -89,6 +89,9 @@ export interface StartupClusterMatch {
     trendAlignment: number; // 0-40 points
     marketTiming: number; // 0-30 points
     sectorFit: number; // 0-30 points
+    marketMomentum?: number; // 0-15 points (derived from cluster trends)
+    fundingClimate?: number; // 0-10 points (derived from sector activity)
+    clusterTrendScore?: number; // 0-100 (average of matched clusters)
   };
 }
 
