@@ -265,7 +265,7 @@ export default function Index() {
                 <Sparkles className="h-6 w-6 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Startup Clustering Tool</h1>
+                <h1 className="text-2xl font-bold">FundRadar</h1>
                 <p className="text-sm text-muted-foreground">AI-powered hierarchical trend analysis</p>
               </div>
             </div>
