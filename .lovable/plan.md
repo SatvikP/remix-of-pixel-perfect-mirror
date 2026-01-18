@@ -1,58 +1,79 @@
 
 
-## Auth Page Redesign with Oxaley-like Design System
+## Data Persistence for User Startups
 
-I'll transform the login page to use the elegant dark-to-indigo gradient background with the sophisticated color palette you've provided.
+I'll implement a system to persist uploaded CSV data so returning users see their dashboard immediately without re-uploading.
 
-### Design Changes Overview
+### Database Schema
 
-**Background Transformation:**
-- Replace the plain `bg-background` with the hero gradient: `radial-gradient` from deep ink (#050414) through indigo (#17155D) to periwinkle (#6B63CC)
-- Add subtle glow effect for depth
+Create a new `user_startups` table:
 
-**Card Styling:**
-- Semi-transparent white card with blur backdrop for glassmorphism effect
-- Subtle border using `rgba(255,255,255,0.18)` for on-dark surfaces
-- Increased border radius to `lg` (16px) per the design system
+```sql
+CREATE TABLE user_startups (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  website TEXT,
+  tags TEXT,
+  linkedin TEXT,
+  blurb TEXT,
+  location TEXT,
+  maturity TEXT,
+  amount_raised TEXT,
+  business_type TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
 
-**Color Updates:**
-- Primary text on dark: `#FFFFFF`
-- Secondary text on dark: `rgba(255,255,255,0.62)`
-- Keep the existing font family (Inter) as requested
+-- RLS policies for user data isolation
+ALTER TABLE user_startups ENABLE ROW LEVEL SECURITY;
 
-**Button Styling:**
-- Google button: Ghost style with transparent background and white border
-- Submit button: Solid white background with dark text (primary button style)
-- Pill-shaped buttons with `rounded-full`
+CREATE POLICY "Users can view own startups" 
+  ON user_startups FOR SELECT 
+  USING (auth.uid() = user_id);
 
-**Form Elements:**
-- Input fields with dark backgrounds and light text
-- Subtle borders matching the design system
-- Focus ring using the periwinkle color
+CREATE POLICY "Users can insert own startups" 
+  ON user_startups FOR INSERT 
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own startups" 
+  ON user_startups FOR UPDATE 
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete own startups" 
+  ON user_startups FOR DELETE 
+  USING (auth.uid() = user_id);
+```
 
 ### Implementation Steps
 
-1. **Update Auth.tsx styling:**
-   - Apply gradient background to the page container
-   - Restyle the Card with glassmorphism (backdrop blur, semi-transparent)
-   - Update text colors to use on-dark palette
-   - Restyle buttons to match the design system
-   - Update input fields for dark theme
-   - Add subtle animations for hover states
+**1. API Functions (src/lib/api.ts)**
+- Add `saveUserStartups(startups: Startup[])` - saves parsed CSV to database
+- Add `fetchUserStartups()` - retrieves user's saved startups
+- Add `deleteUserStartups()` - clears user's startups (for re-upload)
 
-2. **CSS Variables (optional):**
-   - Could add custom CSS variables for the design tokens if we want reusability
+**2. Index.tsx Changes**
+- On mount: fetch user's saved startups from database
+- If startups exist: automatically run the clustering/analysis
+- On CSV upload + process: save startups to database
+- Add a "Clear My Data" button to allow re-uploading a new CSV
 
-### Visual Result
+### User Flow After Implementation
 
-The login page will feature:
-- Deep indigo-to-black gradient background with subtle glow
-- Floating glass-like card with blur effect
-- Crisp white text and labels
-- Elegant pill-shaped buttons
-- Professional, modern SaaS aesthetic matching the Oxaley reference
+**First-time user:**
+1. Logs in → sees upload screen
+2. Uploads CSV → processes → sees dashboard
+3. Startups are saved to database
+
+**Returning user:**
+1. Logs in → startups auto-loaded from database
+2. Clustering runs automatically
+3. Sees dashboard immediately (no upload needed)
+4. Can use "Clear Data" to upload a new CSV
 
 ### Critical Files for Implementation
-- `src/pages/Auth.tsx` - Main styling changes for the login page
-- `src/index.css` - Optional: Add custom CSS variables for the design tokens
+- `src/lib/api.ts` - Add database functions for startup CRUD operations
+- `src/pages/Index.tsx` - Add auto-load logic and save-on-process
+- `src/lib/types.ts` - No changes needed, Startup type already complete
+- Database migration - Create `user_startups` table with RLS policies
 
