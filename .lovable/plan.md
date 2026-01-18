@@ -1,55 +1,70 @@
 
 
-## Add Navigation Between Upload and Results Dashboard
+## User Analytics Tracking: Signups and CSV Uploads
 
-### Problem
-Currently, when a user has saved startups, the app automatically processes them and shows results. Users cannot easily switch between the upload/settings view and the results dashboard without clearing their data.
+### Overview
+Add tracking for user signups and CSV upload status to understand user engagement and identify drop-off points.
 
-### Solution
-Add a view mode toggle that allows users to switch between "Settings" (upload/configuration) and "Dashboard" (results) views, and disable auto-processing.
+### Database Changes
+
+**1. Create `user_profiles` table:**
+```sql
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL UNIQUE,
+  email TEXT,
+  has_uploaded_csv BOOLEAN DEFAULT FALSE,
+  first_csv_upload_at TIMESTAMPTZ,
+  total_csv_uploads INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  last_seen_at TIMESTAMPTZ DEFAULT now()
+);
+```
+
+**2. Create trigger to auto-populate on signup:**
+A database trigger will automatically create a profile row when a new user signs up via Supabase Auth.
+
+**3. RLS policies:**
+- Users can read/update their own profile
+- Admins (you) can read all profiles
+
+### Application Changes
+
+**1. Update CSV upload flow (`src/lib/api.ts`):**
+- When `saveUserStartups()` is called, also update `has_uploaded_csv = true` and increment `total_csv_uploads`
+
+**2. Create Admin Analytics Page (`src/pages/AdminAnalytics.tsx`):**
+- Protected page (only accessible to specific admin emails)
+- Shows total signups count
+- Shows users who uploaded CSV vs. didn't
+- Shows conversion rate (signups -> uploads)
+- Simple table of users with their status
+
+**3. Add navigation to admin page:**
+- Only visible to admin users in the header
+
+### Admin Dashboard Metrics
+
+| Metric | Description |
+|--------|-------------|
+| Total Signups | Count of all user_profiles |
+| Users with CSV Upload | Count where has_uploaded_csv = true |
+| Users without Upload | Count where has_uploaded_csv = false |
+| Conversion Rate | Percentage who uploaded |
+| Recent Signups | Last 7 days |
 
 ### Implementation Steps
 
-**1. Add View State Management**
-- Add a new state variable: `activeView: 'settings' | 'dashboard'`
-- Default to `'dashboard'` if user has saved startups, otherwise `'settings'`
-- Remove auto-processing behavior (delete the `autoProcess` useEffect)
-
-**2. Add Navigation Tabs in Header**
-- Add tab buttons or toggle in the header to switch between views
-- "Settings" tab - shows upload, scraper settings, scoring configuration
-- "Dashboard" tab - shows results (only enabled if results exist or can be generated)
-
-**3. Add Manual "Analyze" Button**
-- When user is on Settings view with saved startups, show an "Analyze Startups" button
-- This replaces the auto-processing behavior and gives users control
-
-**4. Update View Logic**
-- Settings view: Always shows upload area, scrape settings, scoring config
-- Dashboard view: Shows results if available, or prompts to run analysis first
-
-### UI Changes
-
-**Header Navigation:**
-```
-[Settings] [Dashboard]     user@email.com [Sign Out]
-```
-
-**Settings View:**
-- Article status card
-- Scrape settings
-- Scoring configuration  
-- File uploader (if no saved startups)
-- OR "You have X saved startups" with "Re-analyze" button
-- "Clear Data" option
-
-**Dashboard View:**
-- Stats cards
-- Hierarchical clusters
-- Startups table
-- If no results yet: "Run analysis from Settings to see results"
+1. **Database migration**: Create `user_profiles` table with trigger
+2. **Update API**: Modify `saveUserStartups()` to update profile
+3. **Create Admin page**: New route `/admin` with analytics dashboard
+4. **Add routing**: Protected admin route in App.tsx
+5. **Update last_seen**: Track when users log in
 
 ### Critical Files for Implementation
-- `src/pages/Index.tsx` - Add view state, navigation tabs, remove auto-process, update conditional rendering
-- `src/components/ui/tabs.tsx` - May use existing tabs component for navigation
+- `src/lib/api.ts` - Add function to update profile on CSV upload
+- `src/pages/AdminAnalytics.tsx` - New admin dashboard page (create)
+- `src/App.tsx` - Add protected admin route
+- `src/pages/Index.tsx` - Update last_seen on page load
+- Database migration - Create user_profiles table with trigger
 
