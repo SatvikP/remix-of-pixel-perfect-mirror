@@ -196,12 +196,29 @@ export function ScoringConfigurator({ config, onConfigChange }: ScoringConfigura
                                 <span className={`text-sm ${!metric.enabled ? 'text-muted-foreground' : ''}`}>
                                   {metric.name}
                                 </span>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Info className="h-3 w-3 text-muted-foreground" />
+                                <Tooltip delayDuration={200}>
+                                  <TooltipTrigger asChild>
+                                    <button type="button" className="hover:bg-muted rounded p-0.5 transition-colors">
+                                      <Info className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors" />
+                                    </button>
                                   </TooltipTrigger>
-                                  <TooltipContent side="right" className="max-w-xs">
-                                    <p>{metric.description}</p>
+                                  <TooltipContent side="right" className="max-w-sm p-4 space-y-2">
+                                    <p className="font-semibold text-sm">{metric.name}</p>
+                                    <p className="text-sm text-muted-foreground">{metric.description}</p>
+                                    {'detailedInfo' in metric && metric.detailedInfo && (
+                                      <p className="text-xs leading-relaxed">{metric.detailedInfo}</p>
+                                    )}
+                                    {'example' in metric && metric.example && (
+                                      <div className="pt-2 border-t">
+                                        <p className="text-xs text-muted-foreground">
+                                          <span className="font-medium text-foreground">Example: </span>
+                                          {metric.example}
+                                        </p>
+                                      </div>
+                                    )}
+                                    <p className="text-xs text-muted-foreground pt-1">
+                                      Max contribution: {metric.maxPoints} points
+                                    </p>
                                   </TooltipContent>
                                 </Tooltip>
                               </div>
