@@ -8,10 +8,10 @@ import { EnhancedStartupsTable } from '@/components/EnhancedStartupsTable';
 import { ProcessingStatus, ProcessingStep } from '@/components/ProcessingStatus';
 import { StatsCards } from '@/components/StatsCards';
 import { AirtableWebhook, sendToAirtable } from '@/components/AirtableWebhook';
-import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape } from '@/lib/api';
+import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, triggerLightpandaScrape } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Index() {
@@ -54,25 +54,44 @@ export default function Index() {
     loadArticles();
   }, []);
 
-  const handleRefreshArticles = async () => {
+  const handleRefreshArticles = async (useLightpanda = false) => {
     setIsRefreshing(true);
-    toast({ title: 'Refreshing articles...', description: 'This may take a few minutes as we scrape 7 sources.' });
+    const engine = useLightpanda ? 'Lightpanda' : 'Firecrawl';
+    toast({ title: `Refreshing articles with ${engine}...`, description: 'This may take a few minutes.' });
     
     try {
-      const result = await triggerArticleScrape();
-      
-      if (result.success) {
-        toast({ 
-          title: 'Articles refreshed!', 
-          description: `Scraped ${result.stats?.recentArticles || 0} articles, saved ${result.stats?.savedToDb || 0} to database.` 
-        });
+      if (useLightpanda) {
+        const result = await triggerLightpandaScrape();
         
-        // Reload articles from database
-        const { articles, lastUpdated: updated } = await fetchArticlesFromDatabase();
-        setDbArticles(articles);
-        setLastUpdated(updated);
+        if (result.success && result.stats) {
+          toast({ 
+            title: 'Articles refreshed!', 
+            description: `Scraped ${result.stats.articlesScraped} articles in ${result.stats.durationSeconds}s using Lightpanda.` 
+          });
+          
+          // Reload articles from database
+          const { articles, lastUpdated: updated } = await fetchArticlesFromDatabase();
+          setDbArticles(articles);
+          setLastUpdated(updated);
+        } else {
+          toast({ title: 'Refresh failed', description: result.error, variant: 'destructive' });
+        }
       } else {
-        toast({ title: 'Refresh failed', description: result.error, variant: 'destructive' });
+        const result = await triggerArticleScrape();
+        
+        if (result.success) {
+          toast({ 
+            title: 'Articles refreshed!', 
+            description: `Scraped ${result.stats?.recentArticles || 0} articles, saved ${result.stats?.savedToDb || 0} to database.` 
+          });
+          
+          // Reload articles from database
+          const { articles, lastUpdated: updated } = await fetchArticlesFromDatabase();
+          setDbArticles(articles);
+          setLastUpdated(updated);
+        } else {
+          toast({ title: 'Refresh failed', description: result.error, variant: 'destructive' });
+        }
       }
     } catch (err) {
       toast({ title: 'Refresh failed', description: String(err), variant: 'destructive' });
@@ -222,15 +241,28 @@ export default function Index() {
                       </p>
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleRefreshArticles}
-                    disabled={isRefreshing}
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleRefreshArticles(true)}
+                      disabled={isRefreshing}
+                      title="Fast scraper using Lightpanda (EU)"
+                    >
+                      <Zap className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-pulse' : ''}`} />
+                      {isRefreshing ? 'Scraping...' : 'Lightpanda'}
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handleRefreshArticles(false)}
+                      disabled={isRefreshing}
+                      title="Standard Firecrawl scraper"
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      Firecrawl
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

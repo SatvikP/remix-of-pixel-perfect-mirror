@@ -41,7 +41,7 @@ export async function fetchArticlesFromDatabase(): Promise<{
   };
 }
 
-// Trigger a manual refresh of articles
+// Trigger a manual refresh of articles using Firecrawl
 export async function triggerArticleScrape(): Promise<{
   success: boolean;
   stats?: {
@@ -60,6 +60,34 @@ export async function triggerArticleScrape(): Promise<{
 
   return {
     success: data?.success || false,
+    stats: data?.stats,
+    error: data?.error,
+  };
+}
+
+// Trigger a manual refresh of articles using Lightpanda (faster, EU-based)
+export async function triggerLightpandaScrape(): Promise<{
+  success: boolean;
+  engine: string;
+  stats?: {
+    sourcesScanned: number;
+    urlsDiscovered: number;
+    articlesScraped: number;
+    savedToDb: number;
+    durationSeconds: number;
+  };
+  error?: string;
+}> {
+  const { data, error } = await supabase.functions.invoke('scrape-lightpanda');
+
+  if (error) {
+    console.error('Lightpanda scrape error:', error);
+    return { success: false, engine: 'lightpanda', error: error.message };
+  }
+
+  return {
+    success: data?.success || false,
+    engine: 'lightpanda',
     stats: data?.stats,
     error: data?.error,
   };
