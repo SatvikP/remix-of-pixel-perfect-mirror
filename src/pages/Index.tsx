@@ -17,7 +17,7 @@ import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScr
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, type ScoringConfig } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2 } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard } from 'lucide-react';
 import { format } from 'date-fns';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -36,6 +36,9 @@ export default function Index() {
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [savedStartups, setSavedStartups] = useState<Startup[]>([]);
   const [isLoadingStartups, setIsLoadingStartups] = useState(true);
+  
+  // View state - 'settings' for upload/config, 'dashboard' for results
+  const [activeView, setActiveView] = useState<'settings' | 'dashboard'>('settings');
   
   // Article state
   const [dbArticles, setDbArticles] = useState<Article[]>([]);
@@ -118,7 +121,7 @@ export default function Index() {
     loadArticles();
   }, []);
 
-  // Fetch user's saved startups on mount
+  // Fetch user's saved startups on mount and set initial view
   useEffect(() => {
     async function loadSavedStartups() {
       if (!user) return;
@@ -127,6 +130,10 @@ export default function Index() {
         const startups = await fetchUserStartups();
         setSavedStartups(startups);
         console.log(`Loaded ${startups.length} saved startups for user`);
+        // Set initial view based on whether user has saved startups
+        if (startups.length > 0) {
+          setActiveView('dashboard');
+        }
       } catch (err) {
         console.error('Error loading saved startups:', err);
       } finally {
@@ -231,6 +238,7 @@ export default function Index() {
 
       setResult(clusterResult);
       setProcessingStep('complete');
+      setActiveView('dashboard'); // Switch to dashboard after processing
       toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters across sectors.` });
 
     } catch (err) {
@@ -240,17 +248,11 @@ export default function Index() {
     }
   }, [dbArticles, scoringConfig, toast]);
 
-  // Auto-run clustering when saved startups are loaded
-  useEffect(() => {
-    async function autoProcess() {
-      if (savedStartups.length === 0 || result || processingStep !== 'idle') return;
-      if (articlesLoading || isLoadingStartups) return;
-      
-      console.log('Auto-processing saved startups...');
-      await processStartups(savedStartups);
-    }
-    autoProcess();
-  }, [savedStartups, articlesLoading, isLoadingStartups, result, processingStep, processStartups]);
+  // Manual analyze handler for saved startups
+  const handleAnalyzeSavedStartups = async () => {
+    if (savedStartups.length === 0) return;
+    await processStartups(savedStartups);
+  };
 
   const handleProcess = async () => {
     if (!csvFile) {
@@ -278,6 +280,7 @@ export default function Index() {
       setActiveCluster(null);
       setError(undefined);
       setProcessingStep('idle');
+      setActiveView('settings');
       toast({ title: 'Data cleared', description: 'Your startup data has been deleted. Upload a new CSV to start again.' });
     } else {
       toast({ title: 'Failed to clear data', variant: 'destructive' });
@@ -292,6 +295,10 @@ export default function Index() {
     setProcessingStep('idle');
   };
 
+  const isProcessing = processingStep === 'scraping' || processingStep === 'clustering';
+  const hasSavedStartups = savedStartups.length > 0;
+  const hasResults = result !== null;
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -303,12 +310,35 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
-        <div className="container py-6">
+        <div className="container py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-6">
               <div>
-                <h1 className="text-2xl font-bold">FundRadar</h1>
-                <p className="text-sm text-muted-foreground">AI-powered hierarchical trend analysis</p>
+                <h1 className="text-xl font-bold">FundRadar</h1>
+                <p className="text-xs text-muted-foreground">AI-powered trend analysis</p>
+              </div>
+              
+              {/* Navigation Tabs */}
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                <Button
+                  variant={activeView === 'settings' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveView('settings')}
+                  className="gap-2"
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </Button>
+                <Button
+                  variant={activeView === 'dashboard' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveView('dashboard')}
+                  className="gap-2"
+                  disabled={!hasSavedStartups && !hasResults}
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
+                </Button>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -325,7 +355,8 @@ export default function Index() {
       </header>
 
       <main className="container py-8 space-y-8">
-        {!result && (
+        {/* Settings View */}
+        {activeView === 'settings' && (
           <div className="max-w-xl mx-auto space-y-6">
             {/* Article Status Card */}
             <Card>
@@ -374,51 +405,112 @@ export default function Index() {
               onProviderChange={setScraperProvider}
             />
 
-
             {/* Scoring Configuration */}
             <ScoringConfigurator 
               config={scoringConfig} 
               onConfigChange={handleScoringConfigChange} 
             />
 
-            <div className="text-center mb-8">
-              <h2 className="text-xl font-semibold mb-2">Upload Your Startups</h2>
-              <p className="text-muted-foreground">CSV with columns: Name, Website, Tags, Location, Stage, Business Type</p>
-            </div>
-            <FileUploader onFileSelect={handleFileSelect} selectedFile={csvFile} onClear={handleClearFile} />
-            {processingStep !== 'idle' && (
-              <ProcessingStatus step={processingStep} progress={progress} message={statusMessage} error={error} />
+            {/* Saved Startups or File Uploader */}
+            {hasSavedStartups ? (
+              <Card>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">You have {savedStartups.length} saved startups</p>
+                      <p className="text-sm text-muted-foreground">
+                        {hasResults ? 'Results available in Dashboard' : 'Run analysis to see results'}
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleClearData}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear Data
+                    </Button>
+                  </div>
+                  
+                  {processingStep !== 'idle' && (
+                    <ProcessingStatus step={processingStep} progress={progress} message={statusMessage} error={error} />
+                  )}
+                  
+                  <Button 
+                    onClick={handleAnalyzeSavedStartups} 
+                    disabled={isProcessing}
+                    className="w-full" 
+                    size="lg"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    {hasResults ? 'Re-analyze Startups' : 'Analyze Startups'}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <div className="text-center mb-8">
+                  <h2 className="text-xl font-semibold mb-2">Upload Your Startups</h2>
+                  <p className="text-muted-foreground">CSV with columns: Name, Website, Tags, Location, Stage, Business Type</p>
+                </div>
+                <FileUploader onFileSelect={handleFileSelect} selectedFile={csvFile} onClear={handleClearFile} />
+                {processingStep !== 'idle' && (
+                  <ProcessingStatus step={processingStep} progress={progress} message={statusMessage} error={error} />
+                )}
+                <Button 
+                  onClick={handleProcess} 
+                  disabled={!csvFile || isProcessing} 
+                  className="w-full" 
+                  size="lg"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Analyze & Cluster
+                </Button>
+              </>
             )}
-            <Button onClick={handleProcess} disabled={!csvFile || processingStep === 'scraping' || processingStep === 'clustering'} className="w-full" size="lg">
-              <Sparkles className="h-4 w-4 mr-2" />
-              Analyze & Cluster
-            </Button>
           </div>
         )}
 
-        {result && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Results</h2>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleClearData}>
-                  <Trash2 className="h-4 w-4 mr-2" />Clear Data
+        {/* Dashboard View */}
+        {activeView === 'dashboard' && (
+          <>
+            {hasResults ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold">Results</h2>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => setActiveView('settings')}>
+                      <Settings className="h-4 w-4 mr-2" />
+                      Settings
+                    </Button>
+                    <Button variant="outline" onClick={handleReset}>
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Clear Results
+                    </Button>
+                  </div>
+                </div>
+                <StatsCards stats={result.stats} />
+                <div className="grid lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-1">
+                    <HierarchicalClusters clusters={result.clusters} activeCluster={activeCluster} onClusterClick={setActiveCluster} />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <EnhancedStartupsTable startupMatches={result.startupMatches} activeCluster={activeCluster} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-md mx-auto text-center py-16 space-y-4">
+                <LayoutDashboard className="h-12 w-12 mx-auto text-muted-foreground" />
+                <h2 className="text-xl font-semibold">No Results Yet</h2>
+                <p className="text-muted-foreground">
+                  {hasSavedStartups 
+                    ? 'Run analysis from Settings to see your startup clusters and trends.'
+                    : 'Upload a CSV file in Settings to get started.'}
+                </p>
+                <Button onClick={() => setActiveView('settings')}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  Go to Settings
                 </Button>
-                <Button variant="outline" onClick={handleReset}>
-                  <RotateCcw className="h-4 w-4 mr-2" />Start Over
-                </Button>
               </div>
-            </div>
-            <StatsCards stats={result.stats} />
-            <div className="grid lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-1">
-                <HierarchicalClusters clusters={result.clusters} activeCluster={activeCluster} onClusterClick={setActiveCluster} />
-              </div>
-              <div className="lg:col-span-2">
-                <EnhancedStartupsTable startupMatches={result.startupMatches} activeCluster={activeCluster} />
-              </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </main>
     </div>
