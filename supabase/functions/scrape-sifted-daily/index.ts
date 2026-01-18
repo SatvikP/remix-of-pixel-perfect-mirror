@@ -38,6 +38,7 @@ interface FirecrawlScrapeResponse {
 }
 
 const SOURCES = [
+  // Core EU Startup News
   { name: "sifted", url: "https://sifted.eu/latest", articlePattern: /sifted\.eu\/articles\/[a-z0-9-]+/gi },
   { name: "tech_eu", url: "https://tech.eu", articlePattern: /tech\.eu\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
   { name: "eu_startups", url: "https://www.eu-startups.com", articlePattern: /eu-startups\.com\/\d{4}\/\d{2}\/[a-z0-9-]+/gi },
@@ -45,6 +46,39 @@ const SOURCES = [
   { name: "tnw", url: "https://thenextweb.com/latest", articlePattern: /thenextweb\.com\/news\/[a-z0-9-]+/gi },
   { name: "uktn", url: "https://www.uktech.news", articlePattern: /uktech\.news\/news\/[a-z0-9-]+/gi },
   { name: "techcrunch", url: "https://techcrunch.com/region/europe", articlePattern: /techcrunch\.com\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+  
+  // Funding & Investment News
+  { name: "finsmes", url: "https://www.finsmes.com", articlePattern: /finsmes\.com\/\d{4}\/\d{2}\/[a-z0-9-]+\.html/gi },
+  { name: "venturebeat", url: "https://venturebeat.com", articlePattern: /venturebeat\.com\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+  { name: "crunchbase", url: "https://news.crunchbase.com", articlePattern: /news\.crunchbase\.com\/[a-z0-9-]+\/[a-z0-9-]+/gi },
+  
+  // Nordic & Regional
+  { name: "arctic_startup", url: "https://arcticstartup.com", articlePattern: /arcticstartup\.com\/article\/[a-z0-9-]+/gi },
+  { name: "nordic9", url: "https://nordic9.com", articlePattern: /nordic9\.com\/news\/[a-z0-9-]+/gi },
+  
+  // DACH Region (Germany, Austria, Switzerland)
+  { name: "gruenderszene", url: "https://www.businessinsider.de/gruenderszene", articlePattern: /businessinsider\.de\/gruenderszene\/[a-z0-9-]+/gi },
+  { name: "deutsche_startups", url: "https://www.deutsche-startups.de", articlePattern: /deutsche-startups\.de\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+  
+  // France
+  { name: "maddyness", url: "https://www.maddyness.com/uk", articlePattern: /maddyness\.com\/uk\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+  { name: "french_web", url: "https://www.frenchweb.fr", articlePattern: /frenchweb\.fr\/[a-z0-9-]+\/\d+/gi },
+  
+  // Spain & Southern Europe
+  { name: "novobrief", url: "https://novobrief.com", articlePattern: /novobrief\.com\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+  
+  // Benelux
+  { name: "silicon_canals_benelux", url: "https://siliconcanals.com/news", articlePattern: /siliconcanals\.com\/news\/[a-z0-9-]+\/[a-z0-9-]+/gi },
+  
+  // Global VC/Startup News with EU coverage
+  { name: "techfundingnews", url: "https://techfundingnews.com", articlePattern: /techfundingnews\.com\/[a-z0-9-]+/gi },
+  { name: "eu_tech", url: "https://tech.eu/category/deep-tech", articlePattern: /tech\.eu\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+  
+  // Climate & Impact Tech
+  { name: "sifted_sustainability", url: "https://sifted.eu/sector/sustainability", articlePattern: /sifted\.eu\/articles\/[a-z0-9-]+/gi },
+  
+  // AI & Deep Tech
+  { name: "the_decoder", url: "https://the-decoder.com", articlePattern: /the-decoder\.com\/[a-z0-9-]+/gi },
 ];
 
 function extractArticleUrls(markdown: string, pattern: RegExp): string[] {
