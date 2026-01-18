@@ -179,18 +179,21 @@ Deno.serve(async (req) => {
 
     console.log(`Total unique URLs: ${allArticleUrls.size}`);
     
-    const urlsToScrape = Array.from(allArticleUrls.values()).slice(0, 300); // Increased limit
+    const urlsToScrape = Array.from(allArticleUrls.values()); // No limit - scrape all URLs
     const articles: Article[] = [];
-    const batchSize = 15; // Larger batches
+    const batchSize = 20; // Larger batches for speed
 
     for (let i = 0; i < urlsToScrape.length; i += batchSize) {
       const batch = urlsToScrape.slice(i, i + batchSize);
-      console.log(`Scraping batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urlsToScrape.length/batchSize)}...`);
+      console.log(`Scraping batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urlsToScrape.length/batchSize)} (${articles.length} articles so far)...`);
       const batchArticles = await scrapeArticlesBatch(batch, firecrawlKey);
       articles.push(...batchArticles);
       if (batchArticles.length > 0) await saveArticlesToDatabase(batchArticles, supabaseUrl, supabaseKey);
-      if ((Date.now() - startTime) / 1000 > 55) { // Extended time limit
-        console.log(`Time limit reached, scraped ${articles.length} articles`);
+      
+      // Edge functions have ~60s timeout, stop gracefully before that
+      const elapsed = (Date.now() - startTime) / 1000;
+      if (elapsed > 55) {
+        console.log(`Time limit approaching (${elapsed.toFixed(1)}s), saved ${articles.length} articles. Run again to continue.`);
         break;
       }
     }
