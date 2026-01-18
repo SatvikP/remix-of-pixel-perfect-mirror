@@ -136,7 +136,7 @@ const Auth = () => {
         <CardHeader className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Sparkles className="h-8 w-8 text-primary" />
-            <CardTitle className="text-2xl font-bold">Startup Clustering Tool</CardTitle>
+            <CardTitle className="text-2xl font-bold">FundRadar</CardTitle>
           </div>
           <CardDescription>
             {isLogin ? "Sign in to your account" : "Create a new account"}
