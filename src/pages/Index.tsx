@@ -138,10 +138,6 @@ export default function Index() {
         const startups = await fetchUserStartups();
         setSavedStartups(startups);
         console.log(`Loaded ${startups.length} saved startups for user`);
-        // Set initial view based on whether user has saved startups
-        if (startups.length > 0) {
-          setActiveView('dashboard');
-        }
       } catch (err) {
         console.error('Error loading saved startups:', err);
       } finally {
