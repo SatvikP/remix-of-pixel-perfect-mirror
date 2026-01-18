@@ -9,7 +9,7 @@ import { HierarchicalClusters } from '@/components/HierarchicalClusters';
 import { EnhancedStartupsTable } from '@/components/EnhancedStartupsTable';
 import { ProcessingStatus, ProcessingStep } from '@/components/ProcessingStatus';
 import { StatsCards } from '@/components/StatsCards';
-import { AirtableWebhook, sendToAirtable } from '@/components/AirtableWebhook';
+
 import { ScoringConfigurator } from '@/components/ScoringConfigurator';
 import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
@@ -40,11 +40,6 @@ export default function Index() {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  // Airtable webhook state
-  const [airtableWebhookUrl, setAirtableWebhookUrl] = useState<string>(() => {
-    return localStorage.getItem('airtable_webhook_url') || '';
-  });
-  const [parsedStartups, setParsedStartups] = useState<Startup[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(true);
   
   // Scraper provider state
@@ -184,8 +179,6 @@ export default function Index() {
         return;
       }
 
-      // Store parsed startups for Airtable webhook
-      setParsedStartups(startups);
 
       // Use database articles if available, otherwise fallback to static JSON
       let articles: Article[];
@@ -223,15 +216,6 @@ export default function Index() {
       setProcessingStep('complete');
       toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters across sectors.` });
 
-      // Send to Airtable webhook if configured
-      if (airtableWebhookUrl) {
-        const webhookResult = await sendToAirtable(airtableWebhookUrl, startups);
-        if (webhookResult.success) {
-          toast({ title: 'Sent to Airtable', description: `${startups.length} startups sent to your webhook.` });
-        } else {
-          console.warn('Airtable webhook failed:', webhookResult.error);
-        }
-      }
     } catch (err) {
       setProcessingStep('error');
       setError(err instanceof Error ? err.message : 'Error occurred');
@@ -332,11 +316,6 @@ export default function Index() {
               onProviderChange={setScraperProvider}
             />
 
-            {/* Airtable Webhook Integration */}
-            <AirtableWebhook 
-              webhookUrl={airtableWebhookUrl} 
-              onWebhookUrlChange={setAirtableWebhookUrl} 
-            />
 
             {/* Scoring Configuration */}
             <ScoringConfigurator 
