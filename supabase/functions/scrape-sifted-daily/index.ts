@@ -17,299 +17,206 @@ interface Article {
   excerpt: string | null;
 }
 
-interface FirecrawlMapResponse {
-  success: boolean;
-  links?: string[];
-  error?: string;
-}
-
 interface FirecrawlScrapeResponse {
   success: boolean;
   data?: {
     markdown?: string;
+    links?: string[];
     metadata?: {
       title?: string;
       description?: string;
       publishedTime?: string;
       author?: string;
       keywords?: string;
+      ogTitle?: string;
+      ogDescription?: string;
     };
   };
   error?: string;
 }
 
-// All 7 EU startup news sources
-const SOURCES = {
-  sifted: {
-    name: "sifted",
-    baseUrl: "https://sifted.eu",
-    latestPath: "/latest",
-    articlePattern: /^https:\/\/sifted\.eu\/articles\/[^\/\s]+\/?$/,
-    linkExtractPattern: /https:\/\/sifted\.eu\/articles\/[^\s\)]+/g,
-  },
-  tech_eu: {
-    name: "tech_eu",
-    baseUrl: "https://tech.eu",
-    latestPath: "/news",
-    articlePattern: /^https:\/\/tech\.eu\/\d{4}\/\d{2}\/\d{2}\/[^\/\s]+\/?$/,
-    linkExtractPattern: /https:\/\/tech\.eu\/\d{4}\/\d{2}\/\d{2}\/[^\s\)\"]+/g,
-  },
-  eu_startups: {
-    name: "eu_startups",
-    baseUrl: "https://www.eu-startups.com",
-    latestPath: "/category/news",
-    articlePattern: /^https:\/\/www\.eu-startups\.com\/\d{4}\/\d{2}\/[^\/\s]+\/?$/,
-    linkExtractPattern: /https:\/\/www\.eu-startups\.com\/\d{4}\/\d{2}\/[^\s\)\"]+/g,
-  },
-  silicon_canals: {
-    name: "silicon_canals",
-    baseUrl: "https://siliconcanals.com",
-    latestPath: "/news",
-    articlePattern: /^https:\/\/siliconcanals\.com\/news\/[^\/\s]+\/?$/,
-    linkExtractPattern: /https:\/\/siliconcanals\.com\/news\/[^\s\)\"]+/g,
-  },
-  maddyness: {
-    name: "maddyness",
-    baseUrl: "https://www.maddyness.com",
-    latestPath: "/uk/category/startups",
-    articlePattern: /^https:\/\/www\.maddyness\.com\/uk\/\d{4}\/\d{2}\/\d{2}\/[^\/\s]+\/?$/,
-    linkExtractPattern: /https:\/\/www\.maddyness\.com\/uk\/\d{4}\/\d{2}\/\d{2}\/[^\s\)\"]+/g,
-  },
-  bpifrance_hub: {
-    name: "bpifrance_hub",
-    baseUrl: "https://lehub.bpifrance.fr",
-    latestPath: "/actualites",
-    articlePattern: /^https:\/\/lehub\.bpifrance\.fr\/[^\/\s]+\/?$/,
-    linkExtractPattern: /https:\/\/lehub\.bpifrance\.fr\/[^\s\)\"]+/g,
-  },
-  bpifrance_big: {
-    name: "bpifrance_big",
-    baseUrl: "https://bigmedia.bpifrance.fr",
-    latestPath: "/decryptages",
-    articlePattern: /^https:\/\/bigmedia\.bpifrance\.fr\/nos-dossiers\/[^\/\s]+\/?$/,
-    linkExtractPattern: /https:\/\/bigmedia\.bpifrance\.fr\/nos-dossiers\/[^\s\)\"]+/g,
-  },
-};
+// High-yield EU startup news sources - optimized for speed
+const SOURCES = [
+  // Core EU sources - scrape main pages with lots of articles
+  { name: "sifted", url: "https://sifted.eu/latest", articlePattern: /sifted\.eu\/articles\/[a-z0-9-]+/gi },
+  { name: "tech_eu", url: "https://tech.eu", articlePattern: /tech\.eu\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+  { name: "eu_startups", url: "https://www.eu-startups.com", articlePattern: /eu-startups\.com\/\d{4}\/\d{2}\/[a-z0-9-]+/gi },
+  { name: "silicon_canals", url: "https://siliconcanals.com", articlePattern: /siliconcanals\.com\/news\/startups\/[a-z0-9-]+/gi },
+  { name: "tnw", url: "https://thenextweb.com/latest", articlePattern: /thenextweb\.com\/news\/[a-z0-9-]+/gi },
+  { name: "uktn", url: "https://www.uktech.news", articlePattern: /uktech\.news\/news\/[a-z0-9-]+/gi },
+  { name: "techcrunch", url: "https://techcrunch.com/region/europe", articlePattern: /techcrunch\.com\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+  { name: "arctic_startup", url: "https://arcticstartup.com", articlePattern: /arcticstartup\.com\/article\/[a-z0-9-]+/gi },
+  { name: "finsmes", url: "https://www.finsmes.com", articlePattern: /finsmes\.com\/\d{4}\/\d{2}\/[a-z0-9-]+\.html/gi },
+  { name: "venturebeat", url: "https://venturebeat.com", articlePattern: /venturebeat\.com\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
+];
 
-// Discover article URLs from a source using Firecrawl map
-async function discoverSourceArticles(
-  source: typeof SOURCES[keyof typeof SOURCES],
+// Extract article URLs from markdown content
+function extractArticleUrls(markdown: string, pattern: RegExp): string[] {
+  const matches = markdown.match(pattern) || [];
+  return [...new Set(matches.map(url => {
+    let cleanUrl = url.replace(/[)\]\"'\s]+$/, '');
+    if (!cleanUrl.startsWith('https://')) {
+      cleanUrl = 'https://' + cleanUrl;
+    }
+    return cleanUrl.replace(/\/$/, '');
+  }))];
+}
+
+// Scrape a page and extract article links - fast mode
+async function scrapePageForLinks(
+  pageUrl: string,
+  articlePattern: RegExp,
   apiKey: string
 ): Promise<string[]> {
-  console.log(`Discovering articles from ${source.name}...`);
-  
-  const allUrls: string[] = [];
-  const fullUrl = `${source.baseUrl}${source.latestPath}`;
-  
   try {
-    // Try Firecrawl map first
-    const mapResponse = await fetch("https://api.firecrawl.dev/v1/map", {
+    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        url: fullUrl,
-        search: "articles",
-        limit: 50,
+        url: pageUrl,
+        formats: ["markdown", "links"],
+        onlyMainContent: false,
+        waitFor: 1000,
       }),
     });
 
-    const mapData: FirecrawlMapResponse = await mapResponse.json();
+    const data: FirecrawlScrapeResponse = await response.json();
     
-    if (mapData.success && mapData.links) {
-      const articleUrls = mapData.links.filter(url => source.articlePattern.test(url));
-      allUrls.push(...articleUrls);
-      console.log(`[${source.name}] Found ${articleUrls.length} article URLs from map`);
-    } else {
-      console.log(`[${source.name}] Map failed, trying scrape method`);
-      
-      // Fallback: scrape the latest page directly
-      const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    if (!data.success) {
+      console.log(`Failed to scrape ${pageUrl}: ${data.error}`);
+      return [];
+    }
+
+    const urls: string[] = [];
+    
+    if (data.data?.markdown) {
+      urls.push(...extractArticleUrls(data.data.markdown, articlePattern));
+    }
+    
+    if (data.data?.links) {
+      const filteredLinks = data.data.links.filter(link => articlePattern.test(link));
+      urls.push(...filteredLinks);
+    }
+
+    return [...new Set(urls)];
+  } catch (e) {
+    console.error(`Error scraping ${pageUrl}:`, e);
+    return [];
+  }
+}
+
+// Batch scrape articles with metadata extraction from URLs only (faster)
+async function scrapeArticlesBatch(
+  articles: { url: string; source: string }[],
+  apiKey: string
+): Promise<Article[]> {
+  const results: Article[] = [];
+  
+  const promises = articles.map(async ({ url, source }) => {
+    try {
+      const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          url: fullUrl,
+          url,
           formats: ["markdown"],
+          onlyMainContent: true,
         }),
       });
 
-      const scrapeData: FirecrawlScrapeResponse = await scrapeResponse.json();
+      const data: FirecrawlScrapeResponse = await response.json();
       
-      if (scrapeData.success && scrapeData.data?.markdown) {
-        const urlMatches = scrapeData.data.markdown.match(source.linkExtractPattern) || [];
-        const cleanUrls = urlMatches
-          .map(u => u.replace(/[)\]\"]+$/, ''))
-          .filter(u => source.articlePattern.test(u));
-        allUrls.push(...cleanUrls);
-        console.log(`[${source.name}] Found ${cleanUrls.length} article URLs from scrape`);
-      }
-    }
-  } catch (e) {
-    console.error(`[${source.name}] Error discovering articles:`, e);
-  }
+      if (!data.success || !data.data) return null;
 
-  // Dedupe and limit
-  const uniqueUrls = [...new Set(allUrls.map(u => u.replace(/\/$/, '')))];
-  return uniqueUrls.slice(0, 30); // Limit per source
-}
-
-// Parse article content from scraped data
-function parseArticle(
-  url: string, 
-  source: string,
-  data: FirecrawlScrapeResponse["data"]
-): Article {
-  const metadata = data?.metadata || {};
-  
-  // Extract authors
-  const authors: string[] = [];
-  if (metadata.author) {
-    authors.push(...metadata.author.split(/[,&]/).map(a => a.trim()).filter(Boolean));
-  }
-
-  // Extract tags from keywords
-  const tags: string[] = [];
-  if (metadata.keywords) {
-    tags.push(...metadata.keywords.split(",").map(t => t.trim()).filter(Boolean));
-  }
-
-  // Check if article is Pro (Sifted-specific)
-  const isPro = source === "sifted" && Boolean(
-    data?.markdown?.includes("Sifted Pro") || 
-    data?.markdown?.includes("Pro members")
-  );
-
-  return {
-    source,
-    url,
-    title: metadata.title || null,
-    published_date: metadata.publishedTime || null,
-    authors,
-    section: null,
-    tags: tags.slice(0, 5),
-    is_pro: isPro,
-    excerpt: metadata.description || null,
-  };
-}
-
-// Scrape individual articles from a source
-async function scrapeArticles(
-  urls: string[], 
-  source: string,
-  apiKey: string
-): Promise<Article[]> {
-  const articles: Article[] = [];
-  const batchSize = 5;
-  
-  for (let i = 0; i < urls.length; i += batchSize) {
-    const batch = urls.slice(i, i + batchSize);
-    console.log(`[${source}] Scraping batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urls.length/batchSize)}`);
-    
-    const promises = batch.map(async (url) => {
-      try {
-        const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            url,
-            formats: ["markdown"],
-          }),
-        });
-
-        const data: FirecrawlScrapeResponse = await response.json();
-        
-        if (data.success && data.data) {
-          return parseArticle(url, source, data.data);
-        }
-        return null;
-      } catch (e) {
-        console.log(`[${source}] Error scraping ${url}:`, e);
+      const metadata = data.data.metadata || {};
+      const title = metadata.title || metadata.ogTitle;
+      
+      // Skip invalid
+      if (!title || title.length < 10 || title.includes("404") || title.includes("not found")) {
         return null;
       }
-    });
 
-    const results = await Promise.all(promises);
-    articles.push(...results.filter((a): a is Article => a !== null));
-    
-    // Small delay between batches
-    if (i + batchSize < urls.length) {
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }
+      const authors: string[] = [];
+      if (metadata.author) {
+        authors.push(...metadata.author.split(/[,&]/).map(a => a.trim()).filter(Boolean));
+      }
 
-  return articles;
-}
+      const tags: string[] = [];
+      if (metadata.keywords) {
+        tags.push(...metadata.keywords.split(",").map(t => t.trim()).filter(Boolean).slice(0, 5));
+      }
 
-// Filter articles from last 7 days
-function filterRecentArticles(articles: Article[]): Article[] {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 7);
-  
-  return articles.filter(article => {
-    if (!article.published_date) return true; // Keep articles without date
-    
-    try {
-      const pubDate = new Date(article.published_date);
-      return pubDate >= cutoff;
+      return {
+        source,
+        url,
+        title,
+        published_date: metadata.publishedTime || null,
+        authors,
+        section: null,
+        tags,
+        is_pro: source === "sifted" && Boolean(data.data.markdown?.includes("Sifted Pro")),
+        excerpt: metadata.description || metadata.ogDescription || null,
+      };
     } catch {
-      return true;
+      return null;
     }
   });
+
+  const batchResults = await Promise.all(promises);
+  for (const article of batchResults) {
+    if (article) results.push(article);
+  }
+  
+  return results;
 }
 
-// Upsert articles to database
+// Save articles to database
 async function saveArticlesToDatabase(
   articles: Article[],
   supabaseUrl: string,
   supabaseKey: string
-): Promise<{ inserted: number; updated: number; errors: number }> {
+): Promise<{ saved: number; errors: number }> {
   const supabase = createClient(supabaseUrl, supabaseKey);
   
-  let inserted = 0;
-  let updated = 0;
+  let saved = 0;
   let errors = 0;
 
-  for (const article of articles) {
-    try {
-      const { error } = await supabase
-        .from('articles')
-        .upsert({
-          source: article.source,
-          url: article.url,
-          title: article.title,
-          excerpt: article.excerpt,
-          published_date: article.published_date,
-          authors: article.authors,
-          section: article.section,
-          tags: article.tags,
-          is_pro: article.is_pro,
-        }, { 
-          onConflict: 'url',
-          ignoreDuplicates: false 
-        });
+  const batchSize = 50;
+  for (let i = 0; i < articles.length; i += batchSize) {
+    const batch = articles.slice(i, i + batchSize);
+    
+    const { error } = await supabase
+      .from('articles')
+      .upsert(
+        batch.map(a => ({
+          source: a.source,
+          url: a.url,
+          title: a.title,
+          excerpt: a.excerpt,
+          published_date: a.published_date,
+          authors: a.authors,
+          section: a.section,
+          tags: a.tags,
+          is_pro: a.is_pro,
+        })),
+        { onConflict: 'url', ignoreDuplicates: false }
+      );
 
-      if (error) {
-        console.error(`Error upserting article ${article.url}:`, error);
-        errors++;
-      } else {
-        // Can't easily tell if insert or update, count as success
-        inserted++;
-      }
-    } catch (e) {
-      console.error(`Exception upserting article:`, e);
-      errors++;
+    if (error) {
+      console.error(`Batch upsert error:`, error);
+      errors += batch.length;
+    } else {
+      saved += batch.length;
     }
   }
 
-  return { inserted, updated, errors };
+  return { saved, errors };
 }
 
 Deno.serve(async (req) => {
@@ -330,72 +237,93 @@ Deno.serve(async (req) => {
       throw new Error("Supabase credentials not configured");
     }
 
-    console.log("Starting daily EU startup news scrape (7 sources)...");
+    console.log(`Starting EU startup news scrape (${SOURCES.length} sources)...`);
     const startTime = Date.now();
 
-    const allArticles: Article[] = [];
-    const sourceStats: Record<string, { discovered: number; scraped: number }> = {};
+    // Phase 1: Discover article URLs in parallel (faster)
+    console.log("Phase 1: Discovering article URLs in parallel...");
+    
+    const discoveryPromises = SOURCES.map(async (source) => {
+      const urls = await scrapePageForLinks(source.url, source.articlePattern, firecrawlKey);
+      console.log(`[${source.name}] Found ${urls.length} URLs`);
+      return { source: source.name, urls };
+    });
 
-    // Process each source
-    for (const [key, source] of Object.entries(SOURCES)) {
-      try {
-        console.log(`\n=== Processing ${source.name} ===`);
-        
-        // 1. Discover articles
-        const articleUrls = await discoverSourceArticles(source, firecrawlKey);
-        
-        if (articleUrls.length === 0) {
-          console.log(`[${source.name}] No articles discovered, skipping`);
-          sourceStats[key] = { discovered: 0, scraped: 0 };
-          continue;
+    const discoveryResults = await Promise.all(discoveryPromises);
+    
+    // Collect all unique URLs
+    const allArticleUrls: Map<string, { url: string; source: string }> = new Map();
+    const urlCounts: Record<string, number> = {};
+    
+    for (const { source, urls } of discoveryResults) {
+      urlCounts[source] = urls.length;
+      for (const url of urls) {
+        if (!allArticleUrls.has(url)) {
+          allArticleUrls.set(url, { url, source });
         }
-
-        // 2. Scrape articles
-        const articles = await scrapeArticles(articleUrls, source.name, firecrawlKey);
-        allArticles.push(...articles);
-        
-        sourceStats[key] = { 
-          discovered: articleUrls.length, 
-          scraped: articles.length 
-        };
-        
-        console.log(`[${source.name}] Scraped ${articles.length}/${articleUrls.length} articles`);
-        
-        // Delay between sources to avoid rate limiting
-        await new Promise(r => setTimeout(r, 1000));
-        
-      } catch (e) {
-        console.error(`[${source.name}] Source error:`, e);
-        sourceStats[key] = { discovered: 0, scraped: 0 };
       }
     }
 
-    console.log(`\nTotal scraped: ${allArticles.length} articles`);
+    console.log(`Total unique URLs discovered: ${allArticleUrls.size}`);
+    const discoveryTime = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`Discovery took ${discoveryTime}s`);
 
-    // 3. Filter to last 7 days
-    const recentArticles = filterRecentArticles(allArticles);
-    console.log(`${recentArticles.length} articles from last 7 days`);
+    // Phase 2: Scrape articles in smaller batches with immediate saves
+    console.log("\nPhase 2: Scraping article content...");
+    const urlsToScrape = Array.from(allArticleUrls.values()).slice(0, 100); // Reduced limit
+    const articles: Article[] = [];
+    const batchSize = 10; // Smaller batch
 
-    // 4. Save to database
-    console.log("Saving to database...");
-    const dbResult = await saveArticlesToDatabase(recentArticles, supabaseUrl, supabaseKey);
-    console.log(`Database: ${dbResult.inserted} saved, ${dbResult.errors} errors`);
+    for (let i = 0; i < urlsToScrape.length; i += batchSize) {
+      const batch = urlsToScrape.slice(i, i + batchSize);
+      console.log(`Batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urlsToScrape.length/batchSize)}`);
+      
+      const batchArticles = await scrapeArticlesBatch(batch, firecrawlKey);
+      articles.push(...batchArticles);
+      
+      // Save immediately after each batch
+      if (batchArticles.length > 0) {
+        await saveArticlesToDatabase(batchArticles, supabaseUrl, supabaseKey);
+      }
+      
+      // Check time limit (40s to be safe)
+      const elapsed = (Date.now() - startTime) / 1000;
+      if (elapsed > 50) {
+        console.log(`Time limit approaching (${elapsed.toFixed(1)}s), stopping scrape`);
+        break;
+      }
+    }
+
+    console.log(`Total articles scraped: ${articles.length}`);
+
+    // Phase 3: Save to database
+    console.log("\nPhase 3: Saving to database...");
+    const dbResult = await saveArticlesToDatabase(articles, supabaseUrl, supabaseKey);
+    console.log(`Saved: ${dbResult.saved}, Errors: ${dbResult.errors}`);
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`\nDaily scrape completed in ${duration}s`);
+    console.log(`\nScrape completed in ${duration}s`);
+
+    // Count by source
+    const articlesBySource: Record<string, number> = {};
+    for (const article of articles) {
+      articlesBySource[article.source] = (articlesBySource[article.source] || 0) + 1;
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         stats: {
-          sources: sourceStats,
-          totalScraped: allArticles.length,
-          recentArticles: recentArticles.length,
-          savedToDb: dbResult.inserted,
+          sourcesScanned: SOURCES.length,
+          urlsDiscovered: allArticleUrls.size,
+          urlCounts,
+          articlesScraped: articles.length,
+          savedToDb: dbResult.saved,
           dbErrors: dbResult.errors,
           durationSeconds: parseFloat(duration),
+          articlesBySource,
         },
-        articles: recentArticles,
+        articles,
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
