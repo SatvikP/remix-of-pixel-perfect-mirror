@@ -51,11 +51,24 @@ interface StartupClusterMatch {
     trendAlignment: number;
     marketTiming: number;
     sectorFit: number;
+    marketMomentum?: number;
+    fundingClimate?: number;
+    clusterTrendScore?: number;
   };
 }
 
-// Scoring weights by business type
-const SCORING_WEIGHTS: Record<string, { trendAlignment: number; marketTiming: number; sectorFit: number }> = {
+// Custom scoring weights passed from frontend
+interface ScoringWeights {
+  trendAlignment?: number;
+  marketTiming?: number;
+  sectorFit?: number;
+  marketMomentum?: number;
+  fundingClimate?: number;
+  clusterTrendScore?: number;
+}
+
+// Default scoring weights by business type
+const DEFAULT_SCORING_WEIGHTS: Record<string, { trendAlignment: number; marketTiming: number; sectorFit: number }> = {
   saas: { trendAlignment: 40, marketTiming: 35, sectorFit: 25 },
   biotech: { trendAlignment: 25, marketTiming: 25, sectorFit: 50 },
   hardware: { trendAlignment: 30, marketTiming: 30, sectorFit: 40 },
@@ -73,11 +86,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { scrapedArticles, startups, numClusters = 20 } = await req.json() as {
+    const { scrapedArticles, startups, numClusters = 20, scoringWeights } = await req.json() as {
       scrapedArticles: ScrapedArticle[];
       startups: Startup[];
       numClusters?: number;
+      scoringWeights?: ScoringWeights;
     };
+    
+    // Merge custom weights with defaults
+    const customWeights = scoringWeights || {};
+    const hasCustomWeights = Object.keys(customWeights).length > 0;
+    console.log('Using custom scoring weights:', hasCustomWeights ? customWeights : 'none (defaults)');
     
     if (!scrapedArticles || !Array.isArray(scrapedArticles) || scrapedArticles.length === 0) {
       return new Response(
@@ -342,10 +361,55 @@ CRITICAL RULES:
     }
 
     // Build final startup cluster matches with score breakdowns
+    // Apply custom weights if provided
     const startupMatches: StartupClusterMatch[] = parsedMatches.matches.map(match => {
       const startup = startups[match.startupIndex - 1];
-      const scoreBreakdown = match.scoreBreakdown || { trendAlignment: 0, marketTiming: 0, sectorFit: 0 };
-      const investmentScore = scoreBreakdown.trendAlignment + scoreBreakdown.marketTiming + scoreBreakdown.sectorFit;
+      const rawBreakdown = match.scoreBreakdown || { trendAlignment: 0, marketTiming: 0, sectorFit: 0 };
+      
+      // Calculate additional market-derived metrics
+      const matchedClusterData = match.clusters.map(c => 
+        clusterResults.find(cr => cr.id === c.clusterId)
+      ).filter(Boolean);
+      
+      const avgClusterTrendScore = matchedClusterData.length > 0
+        ? Math.round(matchedClusterData.reduce((sum, c) => sum + (c?.trendScore || 0), 0) / matchedClusterData.length)
+        : 0;
+      
+      // Market momentum: higher score for clusters with high trend scores
+      const marketMomentum = Math.round(avgClusterTrendScore * 0.15); // 0-15 points
+      
+      // Funding climate: inferred from cluster trend scores and article density
+      const fundingClimate = Math.round(avgClusterTrendScore * 0.10); // 0-10 points
+      
+      // Build enhanced score breakdown
+      const scoreBreakdown = {
+        trendAlignment: rawBreakdown.trendAlignment,
+        marketTiming: rawBreakdown.marketTiming,
+        sectorFit: rawBreakdown.sectorFit,
+        marketMomentum,
+        fundingClimate,
+        clusterTrendScore: avgClusterTrendScore,
+      };
+      
+      // Calculate investment score based on custom weights or defaults
+      let investmentScore: number;
+      if (hasCustomWeights) {
+        // Use normalized custom weights
+        const totalWeight = Object.values(customWeights).reduce((sum, w) => sum + (w || 0), 0);
+        const normalize = totalWeight > 0 ? 100 / totalWeight : 1;
+        
+        investmentScore = Math.round(
+          ((customWeights.trendAlignment || 0) * (scoreBreakdown.trendAlignment / 40) * normalize) +
+          ((customWeights.marketTiming || 0) * (scoreBreakdown.marketTiming / 30) * normalize) +
+          ((customWeights.sectorFit || 0) * (scoreBreakdown.sectorFit / 30) * normalize) +
+          ((customWeights.marketMomentum || 0) * (marketMomentum / 15) * normalize) +
+          ((customWeights.fundingClimate || 0) * (fundingClimate / 10) * normalize) +
+          ((customWeights.clusterTrendScore || 0) * (avgClusterTrendScore / 100) * normalize)
+        );
+      } else {
+        // Default: sum of core breakdown
+        investmentScore = scoreBreakdown.trendAlignment + scoreBreakdown.marketTiming + scoreBreakdown.sectorFit;
+      }
       
       return {
         startup,
@@ -354,7 +418,7 @@ CRITICAL RULES:
           clusterName: clusterResults.find(cr => cr.id === c.clusterId)?.name || 'Unknown',
           score: c.score,
         })).sort((a, b) => b.score - a.score),
-        investmentScore,
+        investmentScore: Math.min(100, Math.max(0, investmentScore)),
         trendCorrelation: match.trendCorrelation || 0,
         scoreBreakdown,
       };
@@ -369,7 +433,7 @@ CRITICAL RULES:
           clusters: [],
           investmentScore: 0,
           trendCorrelation: 0,
-          scoreBreakdown: { trendAlignment: 0, marketTiming: 0, sectorFit: 0 },
+          scoreBreakdown: { trendAlignment: 0, marketTiming: 0, sectorFit: 0, marketMomentum: 0, fundingClimate: 0, clusterTrendScore: 0 },
         });
       }
     });

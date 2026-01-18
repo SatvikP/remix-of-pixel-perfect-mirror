@@ -81,10 +81,11 @@ export async function scrapeArticles(articles: Article[]): Promise<ScrapeResult>
 export async function clusterStartups(
   scrapedArticles: ScrapedArticle[],
   startups: Startup[],
-  numClusters: number = 10
+  numClusters: number = 10,
+  scoringWeights?: Record<string, number>
 ): Promise<ClusteringResult> {
   const { data, error } = await supabase.functions.invoke('cluster-startups', {
-    body: { scrapedArticles, startups, numClusters },
+    body: { scrapedArticles, startups, numClusters, scoringWeights },
   });
 
   if (error) {

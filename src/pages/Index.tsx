@@ -8,8 +8,11 @@ import { EnhancedStartupsTable } from '@/components/EnhancedStartupsTable';
 import { ProcessingStatus, ProcessingStep } from '@/components/ProcessingStatus';
 import { StatsCards } from '@/components/StatsCards';
 import { AirtableWebhook, sendToAirtable } from '@/components/AirtableWebhook';
+import { ScoringConfigurator } from '@/components/ScoringConfigurator';
+import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
+import { DEFAULT_SCORING_CONFIG, configToWeights, type ScoringConfig } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
 import { Sparkles, RotateCcw, RefreshCw, Database, FileText } from 'lucide-react';
 import { format } from 'date-fns';
@@ -35,6 +38,26 @@ export default function Index() {
   });
   const [parsedStartups, setParsedStartups] = useState<Startup[]>([]);
   const [articlesLoading, setArticlesLoading] = useState(true);
+  
+  // Scoring configuration state
+  const [scoringConfig, setScoringConfig] = useState<ScoringConfig>(() => {
+    const saved = localStorage.getItem('scoring_config');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return DEFAULT_SCORING_CONFIG;
+      }
+    }
+    return DEFAULT_SCORING_CONFIG;
+  });
+  const [selectedStartupIndex, setSelectedStartupIndex] = useState<number | null>(null);
+  
+  // Save scoring config to localStorage
+  const handleScoringConfigChange = useCallback((config: ScoringConfig) => {
+    setScoringConfig(config);
+    localStorage.setItem('scoring_config', JSON.stringify(config));
+  }, []);
 
   // Fetch articles from database on mount
   useEffect(() => {
@@ -144,7 +167,9 @@ export default function Index() {
       setProgress(50);
       setStatusMessage(`Clustering ${startups.length} startups into hierarchical sectors...`);
 
-      const clusterResult = await clusterStartups(articlesToUse, startups, 20);
+      // Pass scoring weights to the clustering function
+      const scoringWeights = configToWeights(scoringConfig);
+      const clusterResult = await clusterStartups(articlesToUse, startups, 20, scoringWeights);
       if (!clusterResult.success) throw new Error(clusterResult.error || 'Failed to cluster');
 
       setResult(clusterResult);
@@ -239,6 +264,12 @@ export default function Index() {
             <AirtableWebhook 
               webhookUrl={airtableWebhookUrl} 
               onWebhookUrlChange={setAirtableWebhookUrl} 
+            />
+
+            {/* Scoring Configuration */}
+            <ScoringConfigurator 
+              config={scoringConfig} 
+              onConfigChange={handleScoringConfigChange} 
             />
 
             <div className="text-center mb-8">
