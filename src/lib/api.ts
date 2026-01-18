@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Article, ScrapeResult, Startup, ClusteringResult, ScrapedArticle } from "./types";
 
+export type ScraperProvider = 'firecrawl' | 'lightpanda';
+
 // Fetch articles from the database
 export async function fetchArticlesFromDatabase(): Promise<{
   articles: Article[];
@@ -42,16 +44,19 @@ export async function fetchArticlesFromDatabase(): Promise<{
 }
 
 // Trigger a manual refresh of articles
-export async function triggerArticleScrape(): Promise<{
+export async function triggerArticleScrape(provider: ScraperProvider = 'firecrawl'): Promise<{
   success: boolean;
   stats?: {
     totalScraped: number;
     recentArticles: number;
     savedToDb: number;
+    provider?: ScraperProvider;
   };
   error?: string;
 }> {
-  const { data, error } = await supabase.functions.invoke('scrape-sifted-daily');
+  const { data, error } = await supabase.functions.invoke('scrape-sifted-daily', {
+    body: { provider },
+  });
 
   if (error) {
     console.error('Scrape trigger error:', error);
@@ -60,18 +65,43 @@ export async function triggerArticleScrape(): Promise<{
 
   return {
     success: data?.success || false,
-    stats: data?.stats,
+    stats: { ...data?.stats, provider },
     error: data?.error,
   };
 }
 
-export async function scrapeArticles(articles: Article[]): Promise<ScrapeResult> {
+export async function scrapeArticles(articles: Article[], provider: ScraperProvider = 'firecrawl'): Promise<ScrapeResult> {
   const { data, error } = await supabase.functions.invoke('scrape-articles', {
-    body: { articles },
+    body: { articles, provider },
   });
 
   if (error) {
     console.error('Scrape error:', error);
+    return { success: false, error: error.message };
+  }
+
+  return { ...data, provider };
+}
+
+// Scrape a single URL with Lightpanda
+export async function scrapeWithLightpanda(url: string): Promise<{
+  success: boolean;
+  data?: {
+    markdown?: string;
+    content?: string;
+    metadata?: {
+      title?: string;
+      description?: string;
+    };
+  };
+  error?: string;
+}> {
+  const { data, error } = await supabase.functions.invoke('scrape-lightpanda', {
+    body: { url },
+  });
+
+  if (error) {
+    console.error('Lightpanda scrape error:', error);
     return { success: false, error: error.message };
   }
 
