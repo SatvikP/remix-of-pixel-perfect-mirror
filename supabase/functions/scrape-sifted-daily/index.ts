@@ -179,16 +179,20 @@ Deno.serve(async (req) => {
 
     console.log(`Total unique URLs: ${allArticleUrls.size}`);
     
-    const urlsToScrape = Array.from(allArticleUrls.values()).slice(0, 100);
+    const urlsToScrape = Array.from(allArticleUrls.values()).slice(0, 300); // Increased limit
     const articles: Article[] = [];
-    const batchSize = 10;
+    const batchSize = 15; // Larger batches
 
     for (let i = 0; i < urlsToScrape.length; i += batchSize) {
       const batch = urlsToScrape.slice(i, i + batchSize);
+      console.log(`Scraping batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(urlsToScrape.length/batchSize)}...`);
       const batchArticles = await scrapeArticlesBatch(batch, firecrawlKey);
       articles.push(...batchArticles);
       if (batchArticles.length > 0) await saveArticlesToDatabase(batchArticles, supabaseUrl, supabaseKey);
-      if ((Date.now() - startTime) / 1000 > 50) break;
+      if ((Date.now() - startTime) / 1000 > 55) { // Extended time limit
+        console.log(`Time limit reached, scraped ${articles.length} articles`);
+        break;
+      }
     }
 
     const dbResult = await saveArticlesToDatabase(articles, supabaseUrl, supabaseKey);
