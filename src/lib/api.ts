@@ -127,44 +127,6 @@ export async function updateLastSeen(): Promise<void> {
     .eq('user_id', user.id);
 }
 
-// Check if current user is an admin
-export async function checkIsAdmin(): Promise<boolean> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { data } = await supabase
-    .from('user_roles')
-    .select('role')
-    .eq('user_id', user.id)
-    .eq('role', 'admin')
-    .single();
-
-  return !!data;
-}
-
-// Fetch all user profiles (admin only)
-export async function fetchAllUserProfiles(): Promise<{
-  id: string;
-  user_id: string;
-  email: string | null;
-  has_uploaded_csv: boolean;
-  first_csv_upload_at: string | null;
-  total_csv_uploads: number;
-  created_at: string;
-  last_seen_at: string;
-}[]> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching user profiles:', error);
-    return [];
-  }
-
-  return data || [];
-}
 
 // Delete all startups for current user
 export async function deleteUserStartups(): Promise<boolean> {
