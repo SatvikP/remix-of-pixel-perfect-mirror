@@ -13,11 +13,11 @@ import { StatsCards } from '@/components/StatsCards';
 import { ScoringConfigurator } from '@/components/ScoringConfigurator';
 import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
-import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape } from '@/lib/api';
+import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, type ScoringConfig } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -34,6 +34,8 @@ export default function Index() {
   const [error, setError] = useState<string | undefined>();
   const [result, setResult] = useState<ClusteringResult | null>(null);
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
+  const [savedStartups, setSavedStartups] = useState<Startup[]>([]);
+  const [isLoadingStartups, setIsLoadingStartups] = useState(true);
   
   // Article state
   const [dbArticles, setDbArticles] = useState<Article[]>([]);
@@ -116,6 +118,24 @@ export default function Index() {
     loadArticles();
   }, []);
 
+  // Fetch user's saved startups on mount
+  useEffect(() => {
+    async function loadSavedStartups() {
+      if (!user) return;
+      setIsLoadingStartups(true);
+      try {
+        const startups = await fetchUserStartups();
+        setSavedStartups(startups);
+        console.log(`Loaded ${startups.length} saved startups for user`);
+      } catch (err) {
+        console.error('Error loading saved startups:', err);
+      } finally {
+        setIsLoadingStartups(false);
+      }
+    }
+    loadSavedStartups();
+  }, [user]);
+
   const handleRefreshArticles = async () => {
     setIsRefreshing(true);
     toast({ 
@@ -124,12 +144,12 @@ export default function Index() {
     });
     
     try {
-      const result = await triggerArticleScrape(scraperProvider);
+      const refreshResult = await triggerArticleScrape(scraperProvider);
       
-      if (result.success) {
+      if (refreshResult.success) {
         toast({ 
           title: 'Articles refreshed!', 
-          description: `Scraped ${result.stats?.recentArticles || 0} articles, saved ${result.stats?.savedToDb || 0} to database.` 
+          description: `Scraped ${refreshResult.stats?.recentArticles || 0} articles, saved ${refreshResult.stats?.savedToDb || 0} to database.` 
         });
         
         // Reload articles from database
@@ -137,7 +157,7 @@ export default function Index() {
         setDbArticles(articles);
         setLastUpdated(updated);
       } else {
-        toast({ title: 'Refresh failed', description: result.error, variant: 'destructive' });
+        toast({ title: 'Refresh failed', description: refreshResult.error, variant: 'destructive' });
       }
     } catch (err) {
       toast({ title: 'Refresh failed', description: String(err), variant: 'destructive' });
@@ -162,23 +182,11 @@ export default function Index() {
     setProcessingStep('idle');
   }, []);
 
-  const handleProcess = async () => {
-    if (!csvFile) {
-      toast({ title: 'No file selected', description: 'Please upload a CSV file.', variant: 'destructive' });
-      return;
-    }
-
+  // Core processing function - can be used for both CSV upload and saved startups
+  const processStartups = useCallback(async (startups: Startup[], saveToDb: boolean = false) => {
     try {
       setError(undefined);
       setResult(null);
-      const csvText = await csvFile.text();
-      const startups = parseCSV(csvText);
-      
-      if (startups.length === 0) {
-        toast({ title: 'Invalid CSV', description: 'No valid startup data found.', variant: 'destructive' });
-        return;
-      }
-
 
       // Use database articles if available, otherwise fallback to static JSON
       let articles: Article[];
@@ -212,6 +220,15 @@ export default function Index() {
       const clusterResult = await clusterStartups(articlesToUse, startups, 20, scoringWeights);
       if (!clusterResult.success) throw new Error(clusterResult.error || 'Failed to cluster');
 
+      // Save startups to database if this is a new upload
+      if (saveToDb) {
+        const saved = await saveUserStartups(startups);
+        if (saved) {
+          setSavedStartups(startups);
+          console.log(`Saved ${startups.length} startups to database`);
+        }
+      }
+
       setResult(clusterResult);
       setProcessingStep('complete');
       toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters across sectors.` });
@@ -220,6 +237,50 @@ export default function Index() {
       setProcessingStep('error');
       setError(err instanceof Error ? err.message : 'Error occurred');
       toast({ title: 'Failed', description: String(err), variant: 'destructive' });
+    }
+  }, [dbArticles, scoringConfig, toast]);
+
+  // Auto-run clustering when saved startups are loaded
+  useEffect(() => {
+    async function autoProcess() {
+      if (savedStartups.length === 0 || result || processingStep !== 'idle') return;
+      if (articlesLoading || isLoadingStartups) return;
+      
+      console.log('Auto-processing saved startups...');
+      await processStartups(savedStartups);
+    }
+    autoProcess();
+  }, [savedStartups, articlesLoading, isLoadingStartups, result, processingStep, processStartups]);
+
+  const handleProcess = async () => {
+    if (!csvFile) {
+      toast({ title: 'No file selected', description: 'Please upload a CSV file.', variant: 'destructive' });
+      return;
+    }
+
+    const csvText = await csvFile.text();
+    const startups = parseCSV(csvText);
+    
+    if (startups.length === 0) {
+      toast({ title: 'Invalid CSV', description: 'No valid startup data found.', variant: 'destructive' });
+      return;
+    }
+
+    await processStartups(startups, true); // Save to DB when uploading new CSV
+  };
+
+  const handleClearData = async () => {
+    const deleted = await deleteUserStartups();
+    if (deleted) {
+      setSavedStartups([]);
+      setCsvFile(null);
+      setResult(null);
+      setActiveCluster(null);
+      setError(undefined);
+      setProcessingStep('idle');
+      toast({ title: 'Data cleared', description: 'Your startup data has been deleted. Upload a new CSV to start again.' });
+    } else {
+      toast({ title: 'Failed to clear data', variant: 'destructive' });
     }
   };
 
@@ -342,7 +403,14 @@ export default function Index() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Results</h2>
-              <Button variant="outline" onClick={handleReset}><RotateCcw className="h-4 w-4 mr-2" />Start Over</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleClearData}>
+                  <Trash2 className="h-4 w-4 mr-2" />Clear Data
+                </Button>
+                <Button variant="outline" onClick={handleReset}>
+                  <RotateCcw className="h-4 w-4 mr-2" />Start Over
+                </Button>
+              </div>
             </div>
             <StatsCards stats={result.stats} />
             <div className="grid lg:grid-cols-3 gap-6">

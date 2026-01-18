@@ -3,6 +3,97 @@ import type { Article, ScrapeResult, Startup, ClusteringResult, ScrapedArticle }
 
 export type ScraperProvider = 'firecrawl' | 'lightpanda';
 
+// ============= User Startups Persistence =============
+
+// Fetch user's saved startups from database
+export async function fetchUserStartups(): Promise<Startup[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from('user_startups')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching user startups:', error);
+    return [];
+  }
+
+  return (data || []).map(row => ({
+    name: row.name,
+    website: row.website || undefined,
+    tags: row.tags || undefined,
+    linkedin: row.linkedin || undefined,
+    blurb: row.blurb || undefined,
+    location: row.location || undefined,
+    maturity: row.maturity as Startup['maturity'],
+    amountRaised: row.amount_raised || undefined,
+    businessType: row.business_type as Startup['businessType'],
+  }));
+}
+
+// Save startups to database for current user
+export async function saveUserStartups(startups: Startup[]): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  // First, delete existing startups for this user
+  const { error: deleteError } = await supabase
+    .from('user_startups')
+    .delete()
+    .eq('user_id', user.id);
+
+  if (deleteError) {
+    console.error('Error deleting existing startups:', deleteError);
+    return false;
+  }
+
+  // Insert new startups
+  const startupsToInsert = startups.map(s => ({
+    user_id: user.id,
+    name: s.name,
+    website: s.website || null,
+    tags: s.tags || null,
+    linkedin: s.linkedin || null,
+    blurb: s.blurb || null,
+    location: s.location || null,
+    maturity: s.maturity || null,
+    amount_raised: s.amountRaised || null,
+    business_type: s.businessType || null,
+  }));
+
+  const { error: insertError } = await supabase
+    .from('user_startups')
+    .insert(startupsToInsert);
+
+  if (insertError) {
+    console.error('Error saving startups:', insertError);
+    return false;
+  }
+
+  return true;
+}
+
+// Delete all startups for current user
+export async function deleteUserStartups(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('user_startups')
+    .delete()
+    .eq('user_id', user.id);
+
+  if (error) {
+    console.error('Error deleting user startups:', error);
+    return false;
+  }
+
+  return true;
+}
+
 // Fetch articles from the database
 export async function fetchArticlesFromDatabase(): Promise<{
   articles: Article[];
