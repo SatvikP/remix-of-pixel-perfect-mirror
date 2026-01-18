@@ -1,79 +1,55 @@
 
 
-## Data Persistence for User Startups
+## Add Navigation Between Upload and Results Dashboard
 
-I'll implement a system to persist uploaded CSV data so returning users see their dashboard immediately without re-uploading.
+### Problem
+Currently, when a user has saved startups, the app automatically processes them and shows results. Users cannot easily switch between the upload/settings view and the results dashboard without clearing their data.
 
-### Database Schema
-
-Create a new `user_startups` table:
-
-```sql
-CREATE TABLE user_startups (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  name TEXT NOT NULL,
-  website TEXT,
-  tags TEXT,
-  linkedin TEXT,
-  blurb TEXT,
-  location TEXT,
-  maturity TEXT,
-  amount_raised TEXT,
-  business_type TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- RLS policies for user data isolation
-ALTER TABLE user_startups ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view own startups" 
-  ON user_startups FOR SELECT 
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can insert own startups" 
-  ON user_startups FOR INSERT 
-  WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can update own startups" 
-  ON user_startups FOR UPDATE 
-  USING (auth.uid() = user_id);
-
-CREATE POLICY "Users can delete own startups" 
-  ON user_startups FOR DELETE 
-  USING (auth.uid() = user_id);
-```
+### Solution
+Add a view mode toggle that allows users to switch between "Settings" (upload/configuration) and "Dashboard" (results) views, and disable auto-processing.
 
 ### Implementation Steps
 
-**1. API Functions (src/lib/api.ts)**
-- Add `saveUserStartups(startups: Startup[])` - saves parsed CSV to database
-- Add `fetchUserStartups()` - retrieves user's saved startups
-- Add `deleteUserStartups()` - clears user's startups (for re-upload)
+**1. Add View State Management**
+- Add a new state variable: `activeView: 'settings' | 'dashboard'`
+- Default to `'dashboard'` if user has saved startups, otherwise `'settings'`
+- Remove auto-processing behavior (delete the `autoProcess` useEffect)
 
-**2. Index.tsx Changes**
-- On mount: fetch user's saved startups from database
-- If startups exist: automatically run the clustering/analysis
-- On CSV upload + process: save startups to database
-- Add a "Clear My Data" button to allow re-uploading a new CSV
+**2. Add Navigation Tabs in Header**
+- Add tab buttons or toggle in the header to switch between views
+- "Settings" tab - shows upload, scraper settings, scoring configuration
+- "Dashboard" tab - shows results (only enabled if results exist or can be generated)
 
-### User Flow After Implementation
+**3. Add Manual "Analyze" Button**
+- When user is on Settings view with saved startups, show an "Analyze Startups" button
+- This replaces the auto-processing behavior and gives users control
 
-**First-time user:**
-1. Logs in → sees upload screen
-2. Uploads CSV → processes → sees dashboard
-3. Startups are saved to database
+**4. Update View Logic**
+- Settings view: Always shows upload area, scrape settings, scoring config
+- Dashboard view: Shows results if available, or prompts to run analysis first
 
-**Returning user:**
-1. Logs in → startups auto-loaded from database
-2. Clustering runs automatically
-3. Sees dashboard immediately (no upload needed)
-4. Can use "Clear Data" to upload a new CSV
+### UI Changes
+
+**Header Navigation:**
+```
+[Settings] [Dashboard]     user@email.com [Sign Out]
+```
+
+**Settings View:**
+- Article status card
+- Scrape settings
+- Scoring configuration  
+- File uploader (if no saved startups)
+- OR "You have X saved startups" with "Re-analyze" button
+- "Clear Data" option
+
+**Dashboard View:**
+- Stats cards
+- Hierarchical clusters
+- Startups table
+- If no results yet: "Run analysis from Settings to see results"
 
 ### Critical Files for Implementation
-- `src/lib/api.ts` - Add database functions for startup CRUD operations
-- `src/pages/Index.tsx` - Add auto-load logic and save-on-process
-- `src/lib/types.ts` - No changes needed, Startup type already complete
-- Database migration - Create `user_startups` table with RLS policies
+- `src/pages/Index.tsx` - Add view state, navigation tabs, remove auto-process, update conditional rendering
+- `src/components/ui/tabs.tsx` - May use existing tabs component for navigation
 
