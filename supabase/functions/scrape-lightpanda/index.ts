@@ -25,11 +25,6 @@ const SOURCES = [
   { name: "eu_startups", url: "https://www.eu-startups.com", articlePattern: /eu-startups\.com\/\d{4}\/\d{2}\/[a-z0-9-]+/gi },
   { name: "silicon_canals", url: "https://siliconcanals.com", articlePattern: /siliconcanals\.com\/news\/startups\/[a-z0-9-]+/gi },
   { name: "tnw", url: "https://thenextweb.com/latest", articlePattern: /thenextweb\.com\/news\/[a-z0-9-]+/gi },
-  { name: "uktn", url: "https://www.uktech.news", articlePattern: /uktech\.news\/news\/[a-z0-9-]+/gi },
-  { name: "techcrunch", url: "https://techcrunch.com/region/europe", articlePattern: /techcrunch\.com\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
-  { name: "arctic_startup", url: "https://arcticstartup.com", articlePattern: /arcticstartup\.com\/article\/[a-z0-9-]+/gi },
-  { name: "finsmes", url: "https://www.finsmes.com", articlePattern: /finsmes\.com\/\d{4}\/\d{2}\/[a-z0-9-]+\.html/gi },
-  { name: "venturebeat", url: "https://venturebeat.com", articlePattern: /venturebeat\.com\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9-]+/gi },
 ];
 
 // Extract article URLs from page content
@@ -120,6 +115,10 @@ Deno.serve(async (req) => {
     
     console.log("Connected to Lightpanda successfully!");
 
+    // Create a SINGLE page and reuse it for all navigations
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
     const allArticleUrls: Map<string, { url: string; source: string }> = new Map();
     const urlCounts: Record<string, number> = {};
     const articles: Article[] = [];
@@ -129,20 +128,15 @@ Deno.serve(async (req) => {
     
     for (const source of SOURCES) {
       try {
-        const page = await browser.newPage();
-        
-        // Set a realistic user agent
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
         console.log(`[${source.name}] Navigating to ${source.url}...`);
         
         await page.goto(source.url, { 
           waitUntil: 'domcontentloaded',
-          timeout: 15000 
+          timeout: 20000 
         });
         
-        // Wait for content to load
-        await page.waitForSelector('body', { timeout: 5000 }).catch(() => {});
+        // Small delay to ensure content is rendered
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Get all links from the page
         const links = await page.evaluate(() => {
@@ -154,53 +148,60 @@ Deno.serve(async (req) => {
         // Also get page content for pattern matching
         const content = await page.content();
         
+        // Reset the regex lastIndex before each use
+        source.articlePattern.lastIndex = 0;
+        
         // Extract article URLs using pattern
         const patternMatches = extractArticleUrls(content, source.articlePattern);
-        const linkMatches = links.filter(link => source.articlePattern.test(link));
+        
+        // Reset again for link matching
+        source.articlePattern.lastIndex = 0;
+        const linkMatches = links.filter((link: string) => {
+          source.articlePattern.lastIndex = 0;
+          return source.articlePattern.test(link);
+        });
         
         const uniqueUrls = [...new Set([...patternMatches, ...linkMatches])];
         urlCounts[source.name] = uniqueUrls.length;
         
         console.log(`[${source.name}] Found ${uniqueUrls.length} article URLs`);
         
-        for (const url of uniqueUrls) {
+        for (const url of uniqueUrls.slice(0, 10)) { // Limit to 10 per source
           if (!allArticleUrls.has(url)) {
             allArticleUrls.set(url, { url, source: source.name });
           }
         }
         
-        await page.close();
-        
         // Check time limit
         const elapsed = (Date.now() - startTime) / 1000;
-        if (elapsed > 45) {
+        if (elapsed > 30) {
           console.log(`Time limit approaching (${elapsed.toFixed(1)}s), moving to article scraping`);
           break;
         }
         
       } catch (err) {
-        console.error(`[${source.name}] Error:`, err);
+        console.error(`[${source.name}] Error:`, err instanceof Error ? err.message : err);
         urlCounts[source.name] = 0;
       }
     }
 
     console.log(`\nTotal unique URLs discovered: ${allArticleUrls.size}`);
 
-    // Phase 2: Scrape individual article content
+    // Phase 2: Scrape individual article content (reusing the same page)
     console.log("\nPhase 2: Scraping article content...");
-    const urlsToScrape = Array.from(allArticleUrls.values()).slice(0, 50); // Limit for time
+    const urlsToScrape = Array.from(allArticleUrls.values()).slice(0, 25); // Limit for time
     
     for (let i = 0; i < urlsToScrape.length; i++) {
       const { url, source } = urlsToScrape[i];
       
       try {
-        const page = await browser.newPage();
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        
         await page.goto(url, { 
           waitUntil: 'domcontentloaded',
-          timeout: 10000 
+          timeout: 15000 
         });
+        
+        // Small delay to ensure content is rendered
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Extract article metadata
         const articleData = await page.evaluate(() => {
@@ -245,18 +246,17 @@ Deno.serve(async (req) => {
         // Skip invalid articles
         if (!articleData.title || articleData.title.length < 10 || 
             articleData.title.includes('404') || articleData.title.includes('not found')) {
-          await page.close();
           continue;
         }
         
         const authors: string[] = [];
         if (articleData.author) {
-          authors.push(...articleData.author.split(/[,&]/).map(a => a.trim()).filter(Boolean));
+          authors.push(...articleData.author.split(/[,&]/).map((a: string) => a.trim()).filter(Boolean));
         }
         
         const tags: string[] = [];
         if (articleData.keywords) {
-          tags.push(...articleData.keywords.split(",").map(t => t.trim()).filter(Boolean).slice(0, 5));
+          tags.push(...articleData.keywords.split(",").map((t: string) => t.trim()).filter(Boolean).slice(0, 5));
         }
         
         articles.push({
@@ -271,22 +271,17 @@ Deno.serve(async (req) => {
           excerpt: articleData.excerpt,
         });
         
-        await page.close();
-        
-        // Log progress every 10 articles
-        if ((i + 1) % 10 === 0) {
-          console.log(`Scraped ${i + 1}/${urlsToScrape.length} articles...`);
-        }
+        console.log(`[${i + 1}/${urlsToScrape.length}] Scraped: ${articleData.title?.substring(0, 50)}...`);
         
         // Check time limit
         const elapsed = (Date.now() - startTime) / 1000;
-        if (elapsed > 50) {
+        if (elapsed > 45) {
           console.log(`Time limit approaching (${elapsed.toFixed(1)}s), stopping scrape`);
           break;
         }
         
       } catch (err) {
-        console.error(`Error scraping ${url}:`, err);
+        console.error(`Error scraping ${url}:`, err instanceof Error ? err.message : err);
       }
     }
 
