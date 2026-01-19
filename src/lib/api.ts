@@ -362,3 +362,39 @@ export function parseCSV(csvText: string): Startup[] {
 
   return startups;
 }
+
+// ============= Email Outreach =============
+
+export interface OutreachEmailData {
+  to: string;
+  subject: string;
+  body: string;
+  senderName: string;
+  replyTo: string;
+  startupName: string;
+}
+
+export async function sendOutreachEmail(data: OutreachEmailData): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  try {
+    const { data: response, error } = await supabase.functions.invoke('send-outreach-email', {
+      body: data,
+    });
+
+    if (error) {
+      console.error('Send email error:', error);
+      return { success: false, error: error.message };
+    }
+
+    if (response?.error) {
+      return { success: false, error: response.error };
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Send email exception:', error);
+    return { success: false, error: error.message || 'Failed to send email' };
+  }
+}
