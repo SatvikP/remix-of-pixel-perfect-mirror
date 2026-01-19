@@ -14,7 +14,7 @@ import { ScoringConfigurator } from '@/components/ScoringConfigurator';
 import { DomainFilter } from '@/components/DomainFilter';
 import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
-import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen, loadDemoStartups } from '@/lib/api';
+import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen, loadDemoStartups, fetchUserProfile, setHasAnalyzed } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, getParentCategoriesFromDomains, type ScoringConfig, type DomainOption } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
@@ -37,6 +37,7 @@ export default function Index() {
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [savedStartups, setSavedStartups] = useState<Startup[]>([]);
   const [isLoadingStartups, setIsLoadingStartups] = useState(true);
+  const [hasAnalyzed, setHasAnalyzedState] = useState<boolean | null>(null); // null = loading
   
   // View state - 'settings' for upload/config, 'dashboard' for results
   const [activeView, setActiveView] = useState<'settings' | 'dashboard'>('settings');
@@ -163,25 +164,32 @@ export default function Index() {
     loadArticles();
   }, []);
 
-  // Fetch user's saved startups on mount and update last_seen
+  // Fetch user's saved startups and profile on mount
   useEffect(() => {
-    async function loadSavedStartups() {
+    async function loadUserData() {
       if (!user) return;
       setIsLoadingStartups(true);
       try {
         // Update last_seen_at
         await updateLastSeen();
         
-        const startups = await fetchUserStartups();
+        // Fetch profile (including has_analyzed flag) and startups in parallel
+        const [profile, startups] = await Promise.all([
+          fetchUserProfile(),
+          fetchUserStartups()
+        ]);
+        
+        setHasAnalyzedState(profile?.hasAnalyzed ?? false);
         setSavedStartups(startups);
-        console.log(`Loaded ${startups.length} saved startups for user`);
+        console.log(`Loaded ${startups.length} saved startups, hasAnalyzed: ${profile?.hasAnalyzed}`);
       } catch (err) {
-        console.error('Error loading saved startups:', err);
+        console.error('Error loading user data:', err);
+        setHasAnalyzedState(false);
       } finally {
         setIsLoadingStartups(false);
       }
     }
-    loadSavedStartups();
+    loadUserData();
   }, [user]);
 
   const handleRefreshArticles = async () => {
@@ -280,6 +288,13 @@ export default function Index() {
       setResult(clusterResult);
       setProcessingStep('complete');
       setActiveView('dashboard'); // Switch to dashboard after processing
+      
+      // Mark user as having analyzed (only updates DB if not already set)
+      if (!hasAnalyzed) {
+        await setHasAnalyzed();
+        setHasAnalyzedState(true);
+      }
+      
       toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters across sectors.` });
 
     } catch (err) {
@@ -287,21 +302,22 @@ export default function Index() {
       setError(err instanceof Error ? err.message : 'Error occurred');
       toast({ title: 'Failed', description: String(err), variant: 'destructive' });
     }
-  }, [dbArticles, scoringConfig, toast]);
+  }, [dbArticles, scoringConfig, toast, hasAnalyzed]);
 
-  // Auto-run analysis when returning user has saved startups but no results
+  // Auto-run analysis ONLY for first-time users who haven't analyzed yet
   useEffect(() => {
     if (
       !isLoadingStartups && 
       !articlesLoading && 
       savedStartups.length > 0 && 
       !result && 
+      hasAnalyzed === false && // Only auto-run if user has NEVER analyzed before
       processingStep === 'idle'
     ) {
-      console.log('Auto-running analysis for returning user with saved startups');
+      console.log('Auto-running analysis for first-time user with saved startups');
       processStartups(savedStartups);
     }
-  }, [isLoadingStartups, articlesLoading, savedStartups, result, processingStep, processStartups]);
+  }, [isLoadingStartups, articlesLoading, savedStartups, result, hasAnalyzed, processingStep, processStartups]);
 
   // Manual analyze handler for saved startups
   const handleAnalyzeSavedStartups = async () => {

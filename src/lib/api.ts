@@ -179,6 +179,45 @@ async function updateProfileCsvUpload(): Promise<void> {
   }
 }
 
+// ============= User Profile Functions =============
+
+// Fetch user profile including has_analyzed flag
+export async function fetchUserProfile(): Promise<{ hasAnalyzed: boolean } | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data, error } = await supabase
+    .from('user_profiles')
+    .select('has_analyzed')
+    .eq('user_id', user.id)
+    .single();
+
+  if (error) {
+    console.error('Error fetching user profile:', error);
+    return null;
+  }
+
+  return { hasAnalyzed: data?.has_analyzed ?? false };
+}
+
+// Set has_analyzed flag to true after first analysis
+export async function setHasAnalyzed(): Promise<boolean> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { error } = await supabase
+    .from('user_profiles')
+    .update({ has_analyzed: true })
+    .eq('user_id', user.id);
+
+  if (error) {
+    console.error('Error updating has_analyzed:', error);
+    return false;
+  }
+
+  return true;
+}
+
 // Update last_seen_at for current user
 export async function updateLastSeen(): Promise<void> {
   const { data: { user } } = await supabase.auth.getUser();

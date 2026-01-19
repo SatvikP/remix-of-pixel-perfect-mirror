@@ -65,6 +65,7 @@ export type Database = {
           demo_loaded_at: string | null
           email: string | null
           first_csv_upload_at: string | null
+          has_analyzed: boolean | null
           has_tried_demo: boolean | null
           has_uploaded_csv: boolean | null
           id: string
@@ -77,6 +78,7 @@ export type Database = {
           demo_loaded_at?: string | null
           email?: string | null
           first_csv_upload_at?: string | null
+          has_analyzed?: boolean | null
           has_tried_demo?: boolean | null
           has_uploaded_csv?: boolean | null
           id?: string
@@ -89,6 +91,7 @@ export type Database = {
           demo_loaded_at?: string | null
           email?: string | null
           first_csv_upload_at?: string | null
+          has_analyzed?: boolean | null
           has_tried_demo?: boolean | null
           has_uploaded_csv?: boolean | null
           id?: string
