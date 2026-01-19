@@ -1,66 +1,97 @@
 
 
-## Add Demo Usage Tracking to User Profiles
+## Plan: Add Domain Filter to Dashboard View
 
-### The Problem
-Currently, the `user_profiles` table only tracks CSV uploads but not demo usage. When users click "Try Demo", we have no visibility into this behavior.
+### Problem
+Currently, users must navigate to Settings to change domain filters, then return to Dashboard to see filtered results. This creates unnecessary friction, especially for power users who want to quickly explore different sectors.
 
-### Solution: Add Demo Tracking Columns
+### Solution
+Add an inline domain filter dropdown directly in the Dashboard header, next to the results title. This allows instant filtering without leaving the view.
 
-#### 1. Database Migration
-Add new columns to `user_profiles`:
-
-```sql
-ALTER TABLE user_profiles 
-ADD COLUMN has_tried_demo boolean DEFAULT false,
-ADD COLUMN demo_loaded_at timestamp with time zone;
+### Current Flow (Friction)
+```
+Dashboard → See results → Want to filter by Fintech → Go to Settings → 
+→ Find Scoring Config → Expand → Select domain → Go back to Dashboard
 ```
 
-#### 2. Update loadDemoStartups() in api.ts
-After loading demo data, update the user profile:
-
-```typescript
-// In loadDemoStartups(), after successfully inserting demo startups:
-await supabase
-  .from('user_profiles')
-  .update({ 
-    has_tried_demo: true, 
-    demo_loaded_at: new Date().toISOString() 
-  })
-  .eq('user_id', user.id);
+### Proposed Flow (Instant)
+```
+Dashboard → Click domain filter dropdown → Select "Fintech" → Results update instantly
 ```
 
-### What You'll Be Able to Query
+### Implementation Details
 
-After implementation, you can run queries like:
+#### 1. Create New Component: `DomainFilter.tsx`
+**File:** `src/components/DomainFilter.tsx`
 
-```sql
--- See all users who tried demo
-SELECT email, demo_loaded_at, has_uploaded_csv 
-FROM user_profiles 
-WHERE has_tried_demo = true;
+A lightweight, reusable domain filter component with:
+- Multi-select popover using existing Popover/Badge components
+- Selected domains shown as removable chips
+- "Clear all" action
+- Compact design for header placement
 
--- Users who tried demo but never uploaded their own data
-SELECT email, demo_loaded_at 
-FROM user_profiles 
-WHERE has_tried_demo = true AND has_uploaded_csv = false;
-
--- Conversion rate: demo → real data
-SELECT 
-  COUNT(*) FILTER (WHERE has_tried_demo) as tried_demo,
-  COUNT(*) FILTER (WHERE has_tried_demo AND has_uploaded_csv) as converted
-FROM user_profiles;
+```tsx
+interface DomainFilterProps {
+  selectedDomains: DomainOption[];
+  onDomainsChange: (domains: DomainOption[]) => void;
+}
 ```
 
-### Files to Change
+#### 2. Update Dashboard View in Index.tsx
+**File:** `src/pages/Index.tsx`
+
+Replace the current passive filter indicator (lines 730-746) with the new interactive `DomainFilter` component:
+
+**Before (read-only display):**
+```tsx
+{selectedDomains.length > 0 && (
+  <span>🔍 X domains filtered [Clear]</span>
+)}
+```
+
+**After (interactive dropdown):**
+```tsx
+<DomainFilter 
+  selectedDomains={selectedDomains}
+  onDomainsChange={handleDomainsChange}
+/>
+```
+
+#### 3. Keep ScoringConfigurator Domain Filter (Optional)
+The Settings page can keep its domain filter for users who prefer configuring everything in one place. Both will share the same state via `selectedDomains` and `handleDomainsChange`.
+
+### UI Design
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  Results    [Filter by domain ▾]  [Fintech ✕] [SaaS ✕]    │
+│                                                            │
+│  ┌──────────────────────────────────────────────────────┐ │
+│  │ Select domains:                                       │ │
+│  │ ☑ Hardware & Robotics    ☑ Fintech                   │ │
+│  │ ☐ SaaS & Software        ☐ Biotech & Health          │ │
+│  │ ☐ DeepTech               ☐ Climate & Energy          │ │
+│  │ ☐ Marketplace            ☐ Other                     │ │
+│  └──────────────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────────────────┘
+```
+
+### File Changes Summary
 
 | File | Change |
 |------|--------|
-| Database migration | Add `has_tried_demo` and `demo_loaded_at` columns |
-| `src/lib/api.ts` | Update profile after loading demo |
-| `src/integrations/supabase/types.ts` | Auto-regenerated |
+| `src/components/DomainFilter.tsx` | **NEW** - Reusable domain filter component |
+| `src/pages/Index.tsx` | Replace passive filter indicator with interactive DomainFilter |
+
+### Benefits
+
+- **Zero navigation**: Filter without leaving the Dashboard
+- **Instant feedback**: See filtered results immediately
+- **Discoverable**: Prominent placement makes the feature obvious
+- **Consistent**: Uses same state/logic as Settings filter
 
 ### Critical Files for Implementation
-- `src/lib/api.ts` - Update `loadDemoStartups()` to track demo usage
-- Database schema - Add new columns to `user_profiles` table
+- `src/components/DomainFilter.tsx` - New reusable domain filter component
+- `src/pages/Index.tsx` - Add DomainFilter to Dashboard header (lines 727-757)
+- `src/lib/scoring-config.ts` - Import DOMAIN_OPTIONS for the filter options
 
