@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, Check } from "lucide-react";
 import { z } from "zod";
 import type { Session } from "@supabase/supabase-js";
 
@@ -15,6 +15,7 @@ const authSchema = z.object({
 });
 
 const Auth = () => {
+  const [showGetStarted, setShowGetStarted] = useState(true);
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -126,6 +127,74 @@ const Auth = () => {
     setLoading(false);
   };
 
+  const features = [
+    "Works with your CRM (500+ potential investments)",
+    "We track market trends in real-time",
+    "Get weekly: \"Top 5 startups to talk to + why\""
+  ];
+
+  // Get Started Landing Page
+  if (showGetStarted) {
+    return (
+      <div 
+        className="min-h-screen flex flex-col items-center justify-center p-6 text-center"
+        style={{
+          background: "linear-gradient(180deg, #050414 0%, #17155D 45%, #9b8ec7 100%)"
+        }}
+      >
+        <div className="max-w-md w-full space-y-8 animate-fade-in">
+          {/* Logo */}
+          <div className="flex items-center justify-center gap-2">
+            <Sparkles className="h-8 w-8 text-white" />
+            <h1 className="text-2xl font-bold text-white">FundRadar</h1>
+          </div>
+
+          {/* Main Headline */}
+          <h2 className="text-3xl md:text-4xl font-bold text-white leading-tight">
+            Stop guessing which startups to call this week
+          </h2>
+
+          {/* Subheadline */}
+          <p className="text-lg text-white/80">
+            Identify <em className="font-medium text-white">early signals</em> before trends hit mainstream
+          </p>
+
+          {/* Feature List */}
+          <div className="space-y-4 text-left mx-auto max-w-sm pt-4">
+            {features.map((feature, index) => (
+              <div key={index} className="flex items-start gap-3">
+                <div className="mt-0.5 flex-shrink-0">
+                  <Check className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-white/90 text-base">{feature}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Get Started Button */}
+          <div className="pt-6">
+            <Button 
+              onClick={() => setShowGetStarted(false)}
+              className="h-12 px-8 rounded-full font-semibold text-base transition-all hover:opacity-90 hover:scale-105"
+              style={{
+                backgroundColor: "#FFFFFF",
+                color: "#050414"
+              }}
+            >
+              Get Started
+            </Button>
+          </div>
+
+          {/* Footer Text */}
+          <p className="text-sm text-white/60 pt-4">
+            Built for Seed-Series A VCs tracking 500+ startups.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Login/Signup Form
   return (
     <div 
       className="min-h-screen flex items-center justify-center p-4"
@@ -134,7 +203,7 @@ const Auth = () => {
       }}
     >
       <div 
-        className="w-full max-w-md rounded-2xl p-8 backdrop-blur-xl"
+        className="w-full max-w-md rounded-2xl p-8 backdrop-blur-xl animate-fade-in"
         style={{
           background: "rgba(255, 255, 255, 0.08)",
           border: "1px solid rgba(255, 255, 255, 0.18)",
@@ -266,6 +335,18 @@ const Auth = () => {
               onClick={() => setIsLogin(!isLogin)}
             >
               {isLogin ? "Sign up" : "Sign in"}
+            </button>
+          </div>
+
+          {/* Back to Landing */}
+          <div className="text-center">
+            <button
+              type="button"
+              className="text-sm hover:underline transition-colors"
+              style={{ color: "rgba(255,255,255,0.5)" }}
+              onClick={() => setShowGetStarted(true)}
+            >
+              ← Back
             </button>
           </div>
         </div>
