@@ -1,70 +1,66 @@
 
 
-## User Analytics Tracking: Signups and CSV Uploads
+## Get Started Landing Page for Auth
 
 ### Overview
-Add tracking for user signups and CSV upload status to understand user engagement and identify drop-off points.
+Add a "Get Started" landing page that appears before the login/signup form on the `/auth` route. The page will replicate the exact design from your screenshot with a "Get Started" button that transitions to the login form.
 
-### Database Changes
+### Design Elements to Implement
 
-**1. Create `user_profiles` table:**
-```sql
-CREATE TABLE user_profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL UNIQUE,
-  email TEXT,
-  has_uploaded_csv BOOLEAN DEFAULT FALSE,
-  first_csv_upload_at TIMESTAMPTZ,
-  total_csv_uploads INTEGER DEFAULT 0,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  last_seen_at TIMESTAMPTZ DEFAULT now()
-);
-```
+**From the screenshot:**
+- **Logo**: "FundRadar" in bold white text at the top
+- **Main headline**: "Stop guessing which startups to call this week"
+- **Subheadline**: "Identify *early signals* before trends hit mainstream" (with "early signals" in italics)
+- **Three bullet points with checkmarks**:
+  - Works with your CRM (500+ potential investments)
+  - We track market trends in real-time
+  - Get weekly: "Top 5 startups to talk to + why"
+- **Footer text**: "Built for Seed-Series A VCs tracking 500+ startups."
+- **Background**: Gradient from dark navy/blue at top to light purple/lavender at bottom
+- **Get Started button**: Prominent CTA button
 
-**2. Create trigger to auto-populate on signup:**
-A database trigger will automatically create a profile row when a new user signs up via Supabase Auth.
+### Implementation Approach
 
-**3. RLS policies:**
-- Users can read/update their own profile
-- Admins (you) can read all profiles
+**Option 1 (Recommended): Use local state to toggle between views**
+- Add a `showGetStarted` state (default: `true`)
+- When `true`, show the landing page with "Get Started" button
+- When "Get Started" is clicked, set state to `false` to reveal the login form
+- Keeps everything on the same route (`/auth`)
 
-### Application Changes
+### Component Structure Changes
 
-**1. Update CSV upload flow (`src/lib/api.ts`):**
-- When `saveUserStartups()` is called, also update `has_uploaded_csv = true` and increment `total_csv_uploads`
+**Modify `src/pages/Auth.tsx`:**
 
-**2. Create Admin Analytics Page (`src/pages/AdminAnalytics.tsx`):**
-- Protected page (only accessible to specific admin emails)
-- Shows total signups count
-- Shows users who uploaded CSV vs. didn't
-- Shows conversion rate (signups -> uploads)
-- Simple table of users with their status
+1. Add new state: `const [showGetStarted, setShowGetStarted] = useState(true);`
 
-**3. Add navigation to admin page:**
-- Only visible to admin users in the header
+2. Create a `GetStartedView` component/section containing:
+   - FundRadar logo (using the existing Sparkles icon + text)
+   - Main headline with proper typography
+   - Subheadline with italic emphasis on "early signals"
+   - Three feature bullet points using Check icons from lucide-react
+   - Footer tagline
+   - "Get Started" button that calls `setShowGetStarted(false)`
 
-### Admin Dashboard Metrics
+3. Use the same gradient background as the current auth page (dark navy to purple gradient)
 
-| Metric | Description |
-|--------|-------------|
-| Total Signups | Count of all user_profiles |
-| Users with CSV Upload | Count where has_uploaded_csv = true |
-| Users without Upload | Count where has_uploaded_csv = false |
-| Conversion Rate | Percentage who uploaded |
-| Recent Signups | Last 7 days |
+4. Add smooth transition/animation between views (optional fade effect)
+
+### Styling Details
+
+- Background: Linear gradient from `#050414` (dark navy) at top to `#9b8ec7` (lavender) at bottom
+- Text colors: White for headings, slightly muted white for body text
+- Font sizes: Large for headline (~2.5rem), medium for subheadline (~1.25rem)
+- Check icons: White with subtle styling
+- Button: White background with dark text (matching existing auth button style)
 
 ### Implementation Steps
 
-1. **Database migration**: Create `user_profiles` table with trigger
-2. **Update API**: Modify `saveUserStartups()` to update profile
-3. **Create Admin page**: New route `/admin` with analytics dashboard
-4. **Add routing**: Protected admin route in App.tsx
-5. **Update last_seen**: Track when users log in
+1. **Add state and imports**: Add `showGetStarted` state and `Check` icon import from lucide-react
+2. **Create landing content**: Build the "Get Started" view with all text and styling from the screenshot
+3. **Conditional rendering**: Show landing page when `showGetStarted` is true, login form when false
+4. **Add smooth transition**: Optional CSS transition between the two views
+5. **Test flow**: Verify the complete flow from landing to login to app
 
 ### Critical Files for Implementation
-- `src/lib/api.ts` - Add function to update profile on CSV upload
-- `src/pages/AdminAnalytics.tsx` - New admin dashboard page (create)
-- `src/App.tsx` - Add protected admin route
-- `src/pages/Index.tsx` - Update last_seen on page load
-- Database migration - Create user_profiles table with trigger
+- `src/pages/Auth.tsx` - Main file to modify with the new landing view and state toggle
 
