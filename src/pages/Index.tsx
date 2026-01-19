@@ -17,7 +17,7 @@ import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScr
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, getParentCategoriesFromDomains, type ScoringConfig, type DomainOption } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -338,6 +338,44 @@ export default function Index() {
   const isProcessing = processingStep === 'scraping' || processingStep === 'clustering';
   const hasSavedStartups = savedStartups.length > 0;
   const hasResults = result !== null;
+  
+  // State for showing the add new startups file uploader
+  const [showAddStartups, setShowAddStartups] = useState(false);
+  
+  // Handle adding new startups from CSV
+  const handleAddNewStartups = async (file: File) => {
+    const csvText = await file.text();
+    const newStartups = parseCSV(csvText);
+    
+    if (newStartups.length === 0) {
+      toast({ title: 'Invalid CSV', description: 'No valid startup data found.', variant: 'destructive' });
+      return;
+    }
+    
+    // Merge with existing startups, avoiding duplicates by name (case-insensitive)
+    const existingNames = new Set(savedStartups.map(s => s.name.toLowerCase()));
+    const uniqueNewStartups = newStartups.filter(s => !existingNames.has(s.name.toLowerCase()));
+    
+    if (uniqueNewStartups.length === 0) {
+      toast({ title: 'No new startups', description: 'All startups in the CSV already exist.', variant: 'destructive' });
+      return;
+    }
+    
+    const mergedStartups = [...savedStartups, ...uniqueNewStartups];
+    
+    // Save merged list to database
+    const saved = await saveUserStartups(mergedStartups);
+    if (saved) {
+      setSavedStartups(mergedStartups);
+      setShowAddStartups(false);
+      toast({ 
+        title: 'Startups added!', 
+        description: `Added ${uniqueNewStartups.length} new startups. Total: ${mergedStartups.length}` 
+      });
+    } else {
+      toast({ title: 'Failed to save startups', variant: 'destructive' });
+    }
+  };
 
   if (authLoading) {
     return (
@@ -474,15 +512,47 @@ export default function Index() {
                     <ProcessingStatus step={processingStep} progress={progress} message={statusMessage} error={error} />
                   )}
                   
-                  <Button 
-                    onClick={handleAnalyzeSavedStartups} 
-                    disabled={isProcessing}
-                    className="w-full" 
-                    size="lg"
-                  >
-                    <Sparkles className="h-4 w-4 mr-2" />
-                    {hasResults ? 'Re-analyze Startups' : 'Analyze Startups'}
-                  </Button>
+                  <div className="flex flex-col gap-3">
+                    <Button 
+                      onClick={handleAnalyzeSavedStartups} 
+                      disabled={isProcessing}
+                      className="w-full" 
+                      size="lg"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      {hasResults ? 'Re-analyze Startups' : 'Analyze Startups'}
+                    </Button>
+                    
+                    <Button 
+                      variant="outline"
+                      onClick={() => setShowAddStartups(!showAddStartups)} 
+                      disabled={isProcessing}
+                      className="w-full" 
+                      size="lg"
+                    >
+                      {showAddStartups ? (
+                        <>
+                          <X className="h-4 w-4 mr-2" />
+                          Cancel
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add New Startups
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {showAddStartups && (
+                    <div className="pt-2">
+                      <FileUploader 
+                        onFileSelect={handleAddNewStartups}
+                        label="Upload additional startups"
+                        description="CSV with columns: Name, Website, Tags, Location, Stage, Business Type"
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : (
