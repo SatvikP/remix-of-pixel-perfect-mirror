@@ -53,6 +53,16 @@ export async function loadDemoStartups(): Promise<Startup[]> {
     return [];
   }
 
+  // Track demo usage in user profile
+  await supabase
+    .from('user_profiles')
+    .update({ 
+      has_tried_demo: true, 
+      demo_loaded_at: new Date().toISOString(),
+      last_seen_at: new Date().toISOString(),
+    })
+    .eq('user_id', user.id);
+
   return demoStartups;
 }
 
