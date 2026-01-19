@@ -41,7 +41,7 @@ const collaborators: Collaborator[] = [
   {
     name: "Pierina Camarena",
     role: "AI Engineer & VC Scout",
-    organization: "Aleph Venture Studio / EWOR",
+    organization: "Aleph Studios / VC Scout - EWOR",
     quote:
       "Would love to see market growth of certain domains and ranking of quality of sources. VCs already know the basics of how their domain is doing.",
   },
