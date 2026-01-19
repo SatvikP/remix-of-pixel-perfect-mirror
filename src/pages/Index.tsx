@@ -288,6 +288,20 @@ export default function Index() {
     }
   }, [dbArticles, scoringConfig, toast]);
 
+  // Auto-run analysis when returning user has saved startups but no results
+  useEffect(() => {
+    if (
+      !isLoadingStartups && 
+      !articlesLoading && 
+      savedStartups.length > 0 && 
+      !result && 
+      processingStep === 'idle'
+    ) {
+      console.log('Auto-running analysis for returning user with saved startups');
+      processStartups(savedStartups);
+    }
+  }, [isLoadingStartups, articlesLoading, savedStartups, result, processingStep, processStartups]);
+
   // Manual analyze handler for saved startups
   const handleAnalyzeSavedStartups = async () => {
     if (savedStartups.length === 0) return;
