@@ -106,7 +106,7 @@ export function ScrapeSettings({ provider, onProviderChange }: ScrapeSettingsPro
 
   const getStatusBadge = (status: ProviderStatus) => {
     if (!status.tested) {
-      return <Badge variant="secondary" className="text-xs">Not tested</Badge>;
+      return null;
     }
     if (status.working) {
       return (
