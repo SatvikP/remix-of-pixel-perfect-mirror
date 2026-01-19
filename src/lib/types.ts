@@ -148,3 +148,31 @@ export const SCORING_WEIGHTS_BY_MATURITY: Record<string, ScoringWeights> = {
   'series-c+': { trendAlignment: 25, marketTiming: 30, sectorFit: 45 },
   'growth': { trendAlignment: 20, marketTiming: 30, sectorFit: 50 },
 };
+
+// ============= Stealth Founders Types =============
+
+export interface StealthFounder {
+  name: string;
+  linkedinUrl: string;
+  // Enriched fields from Dust Agent
+  pastExperience?: string;
+  currentLocation?: string;
+  industryTag?: string;
+  notes?: string;
+  // For trend matching
+  investmentScore?: number;
+  matchedTrends?: string[];
+  // Analysis metadata
+  analyzedAt?: string;
+}
+
+export interface FounderAnalysisResult {
+  success: boolean;
+  founders: StealthFounder[];
+  stats?: {
+    total: number;
+    analyzed: number;
+    failed: number;
+  };
+  error?: string;
+}

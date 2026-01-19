@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { Article, ScrapeResult, Startup, ClusteringResult, ScrapedArticle } from "./types";
+import type { Article, ScrapeResult, Startup, ClusteringResult, ScrapedArticle, StealthFounder, FounderAnalysisResult } from "./types";
 import demoStartupsData from "@/data/demo_startups.json";
 
 export type ScraperProvider = 'firecrawl' | 'lightpanda';
@@ -500,5 +500,94 @@ export async function sendOutreachEmail(data: OutreachEmailData): Promise<{
   } catch (error: any) {
     console.error('Send email exception:', error);
     return { success: false, error: error.message || 'Failed to send email' };
+  }
+}
+
+// ============= Stealth Founders Analysis =============
+
+// Parse CSV for founders (Name, LinkedIn columns)
+export function parseFoundersCSV(csvText: string): StealthFounder[] {
+  const lines = csvText.trim().split('\n');
+  if (lines.length < 2) return [];
+
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/['"]/g, ''));
+  
+  // Find column indices
+  const nameIdx = headers.findIndex(h => h.includes('name'));
+  const linkedinIdx = headers.findIndex(h => h.includes('linkedin') || h.includes('url') || h.includes('link'));
+
+  if (nameIdx === -1) {
+    throw new Error('CSV must have a "Name" column');
+  }
+  if (linkedinIdx === -1) {
+    throw new Error('CSV must have a "LinkedIn" or "URL" column');
+  }
+
+  const founders: StealthFounder[] = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const values: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (const char of line) {
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim().replace(/^["']|["']$/g, ''));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    values.push(current.trim().replace(/^["']|["']$/g, ''));
+
+    const name = values[nameIdx]?.trim();
+    const linkedinUrl = values[linkedinIdx]?.trim();
+    
+    if (!name || !linkedinUrl) continue;
+
+    founders.push({
+      name,
+      linkedinUrl,
+    });
+  }
+
+  return founders;
+}
+
+// Analyze founder profiles with Dust Agent
+export async function analyzeFounderProfiles(founders: StealthFounder[]): Promise<FounderAnalysisResult> {
+  try {
+    const profiles = founders.map(f => ({
+      name: f.name,
+      linkedinUrl: f.linkedinUrl,
+    }));
+
+    const { data, error } = await supabase.functions.invoke('analyze-linkedin-profiles', {
+      body: { profiles },
+    });
+
+    if (error) {
+      console.error('Analyze founders error:', error);
+      return { success: false, founders: [], error: error.message };
+    }
+
+    if (!data?.success) {
+      return { success: false, founders: [], error: data?.error || 'Analysis failed' };
+    }
+
+    return {
+      success: true,
+      founders: data.founders || [],
+      stats: data.stats,
+      error: undefined,
+    };
+  } catch (error: any) {
+    console.error('Analyze founders exception:', error);
+    return { success: false, founders: [], error: error.message || 'Failed to analyze founders' };
   }
 }

@@ -2,3 +2,6 @@ project_id = "yqajwfmyydmfinbpchof"
 
 [functions.send-outreach-email]
 verify_jwt = false
+
+[functions.analyze-linkedin-profiles]
+verify_jwt = false

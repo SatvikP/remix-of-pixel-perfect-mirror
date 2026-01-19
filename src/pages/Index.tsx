@@ -18,7 +18,8 @@ import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScr
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, getParentCategoriesFromDomains, type ScoringConfig, type DomainOption } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter, Plus, BookOpen, Rocket, Upload, Beaker, CheckCircle } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter, Plus, BookOpen, Rocket, Upload, Beaker, CheckCircle, Users } from 'lucide-react';
+import { FoundersAnalysis } from '@/components/FoundersAnalysis';
 import { format } from 'date-fns';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -39,8 +40,8 @@ export default function Index() {
   const [isLoadingStartups, setIsLoadingStartups] = useState(true);
   const [hasAnalyzed, setHasAnalyzedState] = useState<boolean | null>(null); // null = loading
   
-  // View state - 'settings' for upload/config, 'dashboard' for results
-  const [activeView, setActiveView] = useState<'settings' | 'dashboard'>('settings');
+  // View state - 'settings' for upload/config, 'dashboard' for results, 'founders' for LinkedIn analysis
+  const [activeView, setActiveView] = useState<'settings' | 'dashboard' | 'founders'>('settings');
   
   // Article state
   const [dbArticles, setDbArticles] = useState<Article[]>([]);
@@ -472,6 +473,15 @@ export default function Index() {
                   <LayoutDashboard className="h-4 w-4" />
                   Dashboard
                 </Button>
+                <Button
+                  variant={activeView === 'founders' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveView('founders')}
+                  className="gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Founders
+                </Button>
               </div>
               
               {/* Story Link */}
@@ -790,6 +800,11 @@ export default function Index() {
               </div>
             )}
           </>
+        )}
+
+        {/* Founders View */}
+        {activeView === 'founders' && (
+          <FoundersAnalysis onBack={() => setActiveView('settings')} />
         )}
       </main>
     </div>
