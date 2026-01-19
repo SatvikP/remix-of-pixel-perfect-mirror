@@ -368,6 +368,10 @@ Return your analysis in this exact JSON format:
         
         console.log(`Fetching events from: ${eventsUrl}`);
         
+        // Add initial delay to allow Dust agent to start processing
+        console.log(`Waiting 1s before fetching events to allow agent processing...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
         // Poll for events with streaming support
         let attempts = 0;
         const maxAttempts = 90; // Max 90 seconds wait (with 1s intervals)
