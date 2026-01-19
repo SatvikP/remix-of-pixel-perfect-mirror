@@ -133,7 +133,7 @@ const Auth = () => {
     }
     setLoading(false);
   };
-  const features = ["Works with your CRM (500+ potential investments)", "We track market trends in real-time", "Get weekly: \"Top 5 startups to talk to + why\""];
+  const features = ["Works with your CRM.", "We track market trends in real-time", "Get weekly: \"Top 5 startups to talk to + why\""];
 
   // Get Started Landing Page
   if (showGetStarted) {
