@@ -347,6 +347,7 @@ export function parseCSV(csvText: string): Startup[] {
   // Find column indices - extended fields
   const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('startup'));
   const websiteIdx = headers.findIndex(h => h.includes('website') || h.includes('url') || h.includes('site'));
+  const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('mail') || h.includes('contact'));
   const tagsIdx = headers.findIndex(h => h.includes('tag') || h.includes('category') || h.includes('sector'));
   const linkedinIdx = headers.findIndex(h => h.includes('linkedin'));
   const blurbIdx = headers.findIndex(h => h.includes('blurb') || h.includes('description') || h.includes('about'));
@@ -413,6 +414,7 @@ export function parseCSV(csvText: string): Startup[] {
     startups.push({
       name,
       website: websiteIdx >= 0 ? values[websiteIdx]?.trim() : undefined,
+      email: emailIdx >= 0 ? values[emailIdx]?.trim() : undefined,
       tags: tagsIdx >= 0 ? values[tagsIdx]?.trim() : undefined,
       linkedin: linkedinIdx >= 0 ? values[linkedinIdx]?.trim() : undefined,
       blurb: blurbIdx >= 0 ? values[blurbIdx]?.trim() : undefined,
