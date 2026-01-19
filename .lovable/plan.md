@@ -1,97 +1,128 @@
 
 
-## Plan: Add Domain Filter to Dashboard View
+## Plan: Fix Auto-Analysis Running on Every Login
 
 ### Problem
-Currently, users must navigate to Settings to change domain filters, then return to Dashboard to see filtered results. This creates unnecessary friction, especially for power users who want to quickly explore different sectors.
+Every time a user logs in, the analysis re-runs automatically because:
+1. `result` is `null` on page load (not persisted)
+2. The `useEffect` on lines 292-304 triggers if `savedStartups.length > 0 && !result`
+3. This erases/rebuilds the dashboard unnecessarily
 
-### Solution
-Add an inline domain filter dropdown directly in the Dashboard header, next to the results title. This allows instant filtering without leaving the view.
+### Solution: Track Analysis State in User Profile
 
-### Current Flow (Friction)
+Add a simple flag to track whether the user has already run an analysis, then only auto-run for first-time users.
+
+---
+
+### Step 1: Add `has_analyzed` Flag to `user_profiles` Table
+**Database Migration**
+
+Add a new boolean column `has_analyzed` (default: false) to track if the user has completed at least one analysis.
+
+```sql
+ALTER TABLE user_profiles 
+ADD COLUMN has_analyzed BOOLEAN DEFAULT false;
 ```
-Dashboard → See results → Want to filter by Fintech → Go to Settings → 
-→ Find Scoring Config → Expand → Select domain → Go back to Dashboard
-```
 
-### Proposed Flow (Instant)
-```
-Dashboard → Click domain filter dropdown → Select "Fintech" → Results update instantly
-```
+---
 
-### Implementation Details
+### Step 2: Update API to Track Analysis State
+**File:** `src/lib/api.ts`
 
-#### 1. Create New Component: `DomainFilter.tsx`
-**File:** `src/components/DomainFilter.tsx`
+- Add `setHasAnalyzed()` function to update the flag after first analysis
+- Add `fetchUserProfile()` function to get the full profile including `has_analyzed`
 
-A lightweight, reusable domain filter component with:
-- Multi-select popover using existing Popover/Badge components
-- Selected domains shown as removable chips
-- "Clear all" action
-- Compact design for header placement
+---
 
-```tsx
-interface DomainFilterProps {
-  selectedDomains: DomainOption[];
-  onDomainsChange: (domains: DomainOption[]) => void;
+### Step 3: Modify Auto-Analysis Logic
+**File:** `src/pages/Index.tsx`
+
+**Current logic (lines 292-304):**
+```javascript
+// Runs every time if savedStartups exist and result is null
+if (savedStartups.length > 0 && !result && processingStep === 'idle') {
+  processStartups(savedStartups);
 }
 ```
 
-#### 2. Update Dashboard View in Index.tsx
+**New logic:**
+```javascript
+// Only auto-run if:
+// 1. User has saved startups
+// 2. User has NOT analyzed before (first time after upload)
+// 3. No current result
+if (
+  savedStartups.length > 0 && 
+  !result && 
+  !hasAnalyzed &&  // NEW: Check if never analyzed before
+  processingStep === 'idle'
+) {
+  processStartups(savedStartups);
+}
+```
+
+---
+
+### Step 4: Set Flag After Successful Analysis
 **File:** `src/pages/Index.tsx`
 
-Replace the current passive filter indicator (lines 730-746) with the new interactive `DomainFilter` component:
+In `processStartups()`, after successful clustering:
+```javascript
+setResult(clusterResult);
+setProcessingStep('complete');
+setActiveView('dashboard');
 
-**Before (read-only display):**
-```tsx
-{selectedDomains.length > 0 && (
-  <span>🔍 X domains filtered [Clear]</span>
-)}
+// NEW: Mark user as having analyzed
+await setHasAnalyzed();
 ```
 
-**After (interactive dropdown):**
-```tsx
-<DomainFilter 
-  selectedDomains={selectedDomains}
-  onDomainsChange={handleDomainsChange}
-/>
+---
+
+### Step 5: Update UI for Returning Users
+**File:** `src/pages/Index.tsx`
+
+For returning users who have `has_analyzed = true` but no current results:
+- Show Dashboard view with a "Run Analysis" button instead of auto-running
+- Add clear messaging: "Your data is saved. Click to generate fresh insights."
+
+---
+
+### Updated User Flow
+
+```
+FIRST LOGIN (no data):
+├── Show Settings → "Try Demo" or "Upload CSV"
+
+AFTER FIRST UPLOAD/DEMO:
+├── has_analyzed = false, savedStartups exist
+├── AUTO-RUN analysis (one time)
+├── Set has_analyzed = true
+├── Show Dashboard
+
+RETURNING USER (subsequent logins):
+├── has_analyzed = true, savedStartups exist
+├── NO auto-run
+├── Show Settings with message: "Your startups are saved"
+├── User can click "Analyze" button to run manually
+└── Or switch to Dashboard tab (if they want to re-analyze first)
 ```
 
-#### 3. Keep ScoringConfigurator Domain Filter (Optional)
-The Settings page can keep its domain filter for users who prefer configuring everything in one place. Both will share the same state via `selectedDomains` and `handleDomainsChange`.
+---
 
-### UI Design
+### Files to Modify
 
-```
-┌────────────────────────────────────────────────────────────┐
-│  Results    [Filter by domain ▾]  [Fintech ✕] [SaaS ✕]    │
-│                                                            │
-│  ┌──────────────────────────────────────────────────────┐ │
-│  │ Select domains:                                       │ │
-│  │ ☑ Hardware & Robotics    ☑ Fintech                   │ │
-│  │ ☐ SaaS & Software        ☐ Biotech & Health          │ │
-│  │ ☐ DeepTech               ☐ Climate & Energy          │ │
-│  │ ☐ Marketplace            ☐ Other                     │ │
-│  └──────────────────────────────────────────────────────┘ │
-└────────────────────────────────────────────────────────────┘
-```
+| File | Changes |
+|------|---------|
+| `supabase/migrations/` | Add `has_analyzed` column to `user_profiles` |
+| `src/lib/api.ts` | Add `fetchUserProfile()`, `setHasAnalyzed()` functions |
+| `src/pages/Index.tsx` | Modify auto-analysis effect, add `hasAnalyzed` state |
+| `src/integrations/supabase/types.ts` | Auto-updated by Supabase |
 
-### File Changes Summary
-
-| File | Change |
-|------|--------|
-| `src/components/DomainFilter.tsx` | **NEW** - Reusable domain filter component |
-| `src/pages/Index.tsx` | Replace passive filter indicator with interactive DomainFilter |
-
-### Benefits
-
-- **Zero navigation**: Filter without leaving the Dashboard
-- **Instant feedback**: See filtered results immediately
-- **Discoverable**: Prominent placement makes the feature obvious
-- **Consistent**: Uses same state/logic as Settings filter
+---
 
 ### Critical Files for Implementation
-- `src/components/DomainFilter.tsx` - New reusable domain filter component
-- `src/pages/Index.tsx` - Add DomainFilter to Dashboard header (lines 727-757)
-- `src/lib/scoring-config.ts` - Import DOMAIN_OPTIONS for the filter options
+- `src/pages/Index.tsx` - Core auto-analysis logic (lines 292-304) and processStartups callback
+- `src/lib/api.ts` - API functions for fetching/updating user profile
+- `supabase/migrations/` - Database migration for new column
+- `src/integrations/supabase/types.ts` - Pattern reference for Supabase types
 
