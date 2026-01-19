@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,9 @@ import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
 import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
-import { DEFAULT_SCORING_CONFIG, configToWeights, type ScoringConfig } from '@/lib/scoring-config';
+import { DEFAULT_SCORING_CONFIG, configToWeights, getParentCategoriesFromDomains, type ScoringConfig, type DomainOption } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -66,6 +66,47 @@ export default function Index() {
     return DEFAULT_SCORING_CONFIG;
   });
   const [selectedStartupIndex, setSelectedStartupIndex] = useState<number | null>(null);
+  
+  // Domain filter state with localStorage persistence
+  const [selectedDomains, setSelectedDomains] = useState<DomainOption[]>(() => {
+    const saved = localStorage.getItem('selected_domains');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+  
+  // Handle domain changes with persistence
+  const handleDomainsChange = useCallback((domains: DomainOption[]) => {
+    setSelectedDomains(domains);
+    localStorage.setItem('selected_domains', JSON.stringify(domains));
+  }, []);
+  
+  // Filter clusters based on selected domains
+  const filteredClusters = useMemo(() => {
+    if (!result?.clusters || selectedDomains.length === 0) {
+      return result?.clusters || [];
+    }
+    const parentCategories = getParentCategoriesFromDomains(selectedDomains);
+    return result.clusters.filter(cluster => 
+      parentCategories.includes(cluster.parentCategory)
+    );
+  }, [result?.clusters, selectedDomains]);
+  
+  // Filter startup matches based on filtered clusters
+  const filteredStartupMatches = useMemo(() => {
+    if (!result?.startupMatches || selectedDomains.length === 0) {
+      return result?.startupMatches || [];
+    }
+    const filteredClusterIds = new Set(filteredClusters.map(c => c.id));
+    return result.startupMatches.filter(match => 
+      match.clusters.some(c => filteredClusterIds.has(c.clusterId))
+    );
+  }, [result?.startupMatches, selectedDomains, filteredClusters]);
   
   // Save scoring config to localStorage
   const handleScoringConfigChange = useCallback((config: ScoringConfig) => {
@@ -407,7 +448,9 @@ export default function Index() {
             {/* Scoring Configuration */}
             <ScoringConfigurator 
               config={scoringConfig} 
-              onConfigChange={handleScoringConfigChange} 
+              onConfigChange={handleScoringConfigChange}
+              selectedDomains={selectedDomains}
+              onDomainsChange={handleDomainsChange}
             />
 
             {/* Saved Startups or File Uploader */}
@@ -472,7 +515,26 @@ export default function Index() {
             {hasResults ? (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-semibold">Results</h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-xl font-semibold">Results</h2>
+                    {selectedDomains.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
+                          <Filter className="h-3 w-3" />
+                          {selectedDomains.length} domain{selectedDomains.length > 1 ? 's' : ''} filtered
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => handleDomainsChange([])}
+                        >
+                          <X className="h-3 w-3 mr-1" />
+                          Clear
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setActiveView('settings')}>
                       <Settings className="h-4 w-4 mr-2" />
@@ -484,13 +546,17 @@ export default function Index() {
                     </Button>
                   </div>
                 </div>
-                <StatsCards stats={result.stats} />
+                <StatsCards stats={{
+                  ...result.stats,
+                  clustersCreated: filteredClusters.length,
+                  startupsMatched: filteredStartupMatches.length,
+                }} />
                 <div className="grid lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-1">
-                    <HierarchicalClusters clusters={result.clusters} activeCluster={activeCluster} onClusterClick={setActiveCluster} />
+                    <HierarchicalClusters clusters={filteredClusters} activeCluster={activeCluster} onClusterClick={setActiveCluster} />
                   </div>
                   <div className="lg:col-span-2">
-                    <EnhancedStartupsTable startupMatches={result.startupMatches} activeCluster={activeCluster} />
+                    <EnhancedStartupsTable startupMatches={filteredStartupMatches} activeCluster={activeCluster} />
                   </div>
                 </div>
               </div>

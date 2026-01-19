@@ -31,6 +31,23 @@ export const DOMAIN_OPTIONS = [
 
 export type DomainOption = typeof DOMAIN_OPTIONS[number]['value'];
 
+// Map domain options to ParentCategory values for filtering
+export const DOMAIN_TO_PARENT_CATEGORY: Record<DomainOption, string> = {
+  'hardware-robotics': 'hardware',
+  'saas-software': 'saas',
+  'deeptech': 'deeptech',
+  'fintech': 'fintech',
+  'biotech-health': 'biotech',
+  'climate-energy': 'climate',
+  'marketplace': 'marketplace',
+  'other': 'other',
+};
+
+// Get parent categories from selected domains
+export function getParentCategoriesFromDomains(domains: DomainOption[]): string[] {
+  return domains.map(d => DOMAIN_TO_PARENT_CATEGORY[d]);
+}
+
 // Market-focused metrics (derived from articles/trends)
 export const MARKET_METRICS: ScoringMetric[] = [
   {
