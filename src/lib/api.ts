@@ -1,7 +1,60 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Article, ScrapeResult, Startup, ClusteringResult, ScrapedArticle } from "./types";
+import demoStartupsData from "@/data/demo_startups.json";
 
 export type ScraperProvider = 'firecrawl' | 'lightpanda';
+
+// ============= Demo Data Loading =============
+
+// Load demo startups and save to database for current user
+export async function loadDemoStartups(): Promise<Startup[]> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Convert JSON to Startup type
+  const demoStartups: Startup[] = demoStartupsData.map(s => ({
+    name: s.name,
+    blurb: s.blurb,
+    linkedin: s.linkedin || undefined,
+    tags: s.tags,
+  }));
+
+  // Delete existing startups for this user
+  const { error: deleteError } = await supabase
+    .from('user_startups')
+    .delete()
+    .eq('user_id', user.id);
+
+  if (deleteError) {
+    console.error('Error deleting existing startups:', deleteError);
+    return [];
+  }
+
+  // Insert demo startups
+  const startupsToInsert = demoStartups.map(s => ({
+    user_id: user.id,
+    name: s.name,
+    website: null,
+    tags: s.tags || null,
+    linkedin: s.linkedin || null,
+    blurb: s.blurb || null,
+    location: null,
+    maturity: null,
+    amount_raised: null,
+    business_type: null,
+  }));
+
+  const { error: insertError } = await supabase
+    .from('user_startups')
+    .insert(startupsToInsert);
+
+  if (insertError) {
+    console.error('Error saving demo startups:', insertError);
+    return [];
+  }
+
+  return demoStartups;
+}
 
 // ============= User Startups Persistence =============
 

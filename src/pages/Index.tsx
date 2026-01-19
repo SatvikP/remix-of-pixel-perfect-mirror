@@ -13,11 +13,11 @@ import { StatsCards } from '@/components/StatsCards';
 import { ScoringConfigurator } from '@/components/ScoringConfigurator';
 import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
-import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen } from '@/lib/api';
+import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen, loadDemoStartups } from '@/lib/api';
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, getParentCategoriesFromDomains, type ScoringConfig, type DomainOption } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter, Plus, BookOpen } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter, Plus, BookOpen, Rocket, Upload, Beaker, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -356,7 +356,31 @@ export default function Index() {
   // State for showing the add new startups file uploader
   const [showAddStartups, setShowAddStartups] = useState(false);
   
-  // Handle adding new startups from CSV
+  // State for demo data loading
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
+  
+  // Handle loading demo data
+  const handleLoadDemoData = async () => {
+    setIsLoadingDemo(true);
+    try {
+      const demoStartups = await loadDemoStartups();
+      if (demoStartups.length > 0) {
+        setSavedStartups(demoStartups);
+        toast({ 
+          title: 'Demo data loaded!', 
+          description: `${demoStartups.length} stealth startups ready for analysis.` 
+        });
+        // Trigger auto-analysis
+        await processStartups(demoStartups);
+      } else {
+        toast({ title: 'Failed to load demo data', variant: 'destructive' });
+      }
+    } catch (err) {
+      toast({ title: 'Error loading demo data', description: String(err), variant: 'destructive' });
+    } finally {
+      setIsLoadingDemo(false);
+    }
+  };
   const handleAddNewStartups = async (file: File) => {
     const csvText = await file.text();
     const newStartups = parseCSV(csvText);
@@ -579,25 +603,118 @@ export default function Index() {
                 </CardContent>
               </Card>
             ) : (
-              <>
-                <div className="text-center mb-8">
-                  <h2 className="text-xl font-semibold mb-2">Upload Your Startups</h2>
-                  <p className="text-muted-foreground">CSV with columns: Name, Website, Tags, Location, Stage, Business Type</p>
+              <div className="space-y-6">
+                {/* Get Started Header */}
+                <div className="text-center">
+                  <h2 className="text-2xl font-bold mb-2">Get Started with FundRadar</h2>
+                  <p className="text-muted-foreground">Choose how you'd like to explore AI-powered startup analysis</p>
                 </div>
-                <FileUploader onFileSelect={handleFileSelect} selectedFile={csvFile} onClear={handleClearFile} />
+                
+                {/* Two-Option Layout */}
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* Try Demo Card */}
+                  <Card className="border-2 border-primary/20 bg-primary/5 hover:border-primary/40 transition-colors">
+                    <CardContent className="pt-6 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <Rocket className="h-6 w-6 text-primary" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">Try Demo</h3>
+                          <p className="text-sm text-muted-foreground">See FundRadar in action</p>
+                        </div>
+                      </div>
+                      
+                      <p className="text-sm text-muted-foreground">
+                        Load 100 curated stealth startups across 8 sectors. Perfect for exploring trend clustering, filtering, and outreach features.
+                      </p>
+                      
+                      <ul className="space-y-2 text-sm">
+                        <li className="flex items-center gap-2 text-muted-foreground">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          SaaS, Biotech, DeepTech, Fintech
+                        </li>
+                        <li className="flex items-center gap-2 text-muted-foreground">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          Climate, Marketplace, Hardware
+                        </li>
+                        <li className="flex items-center gap-2 text-muted-foreground">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          Instant results, no setup needed
+                        </li>
+                      </ul>
+                      
+                      <Button 
+                        onClick={handleLoadDemoData} 
+                        disabled={isLoadingDemo || isProcessing}
+                        className="w-full" 
+                        size="lg"
+                      >
+                        {isLoadingDemo ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Loading Demo...
+                          </>
+                        ) : (
+                          <>
+                            <Beaker className="h-4 w-4 mr-2" />
+                            Load Demo Data
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                  
+                  {/* Upload Your Own Card */}
+                  <Card className="hover:border-muted-foreground/40 transition-colors">
+                    <CardContent className="pt-6 space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-muted">
+                          <Upload className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">Upload Your Own</h3>
+                          <p className="text-sm text-muted-foreground">Already have a startup list?</p>
+                        </div>
+                      </div>
+                      
+                      <p className="text-sm text-muted-foreground">
+                        Upload your CRM export or custom CSV with your portfolio companies and deal flow.
+                      </p>
+                      
+                      <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
+                        <p className="font-medium mb-1">CSV columns:</p>
+                        <p>Name, Website, Tags, Location, Stage, Business Type</p>
+                      </div>
+                      
+                      <FileUploader 
+                        onFileSelect={handleFileSelect} 
+                        selectedFile={csvFile} 
+                        onClear={handleClearFile}
+                        label="Drop CSV here"
+                        description="or click to browse"
+                      />
+                      
+                      {csvFile && (
+                        <Button 
+                          onClick={handleProcess} 
+                          disabled={isProcessing} 
+                          className="w-full" 
+                          size="lg"
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Analyze & Cluster
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {/* Processing Status */}
                 {processingStep !== 'idle' && (
                   <ProcessingStatus step={processingStep} progress={progress} message={statusMessage} error={error} />
                 )}
-                <Button 
-                  onClick={handleProcess} 
-                  disabled={!csvFile || isProcessing} 
-                  className="w-full" 
-                  size="lg"
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Analyze & Cluster
-                </Button>
-              </>
+              </div>
             )}
           </div>
         )}
