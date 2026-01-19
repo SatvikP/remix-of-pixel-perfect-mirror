@@ -294,8 +294,12 @@ export default function Story() {
             >
               <Link to="/">Try FundRadar</Link>
             </Button>
-            <Button asChild variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10">
-              <a href="mailto:hello@fundradar.com">Get in Touch</a>
+            <Button
+              asChild
+              size="lg"
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white border-none"
+            >
+              <a href="https://www.linkedin.com/in/satvikputi/" target="_blank" rel="noopener noreferrer">Get in Touch</a>
             </Button>
           </div>
         </section>
