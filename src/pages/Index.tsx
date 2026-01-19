@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -17,7 +17,7 @@ import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScr
 import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
 import { DEFAULT_SCORING_CONFIG, configToWeights, getParentCategoriesFromDomains, type ScoringConfig, type DomainOption } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
-import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter, Plus } from 'lucide-react';
+import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter, Plus, BookOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import type { User, Session } from '@supabase/supabase-js';
 
@@ -432,6 +432,15 @@ export default function Index() {
                   Dashboard
                 </Button>
               </div>
+              
+              {/* Story Link */}
+              <Link 
+                to="/story" 
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <BookOpen className="h-4 w-4" />
+                Our Story
+              </Link>
             </div>
             <div className="flex items-center gap-4">
               <span className="text-sm text-muted-foreground hidden sm:block">
