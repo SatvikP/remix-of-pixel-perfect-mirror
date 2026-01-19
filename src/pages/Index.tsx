@@ -526,7 +526,7 @@ export default function Index() {
                       <p className="font-medium">
                         {articlesLoading ? 'Loading articles...' : (
                           dbArticles.length > 0 
-                            ? `${dbArticles.length} articles from 7 EU sources`
+                            ? `${dbArticles.length} articles from 22 EU sources`
                             : `${(siftedArticles as Article[]).length} articles (static backup)`
                         )}
                       </p>
