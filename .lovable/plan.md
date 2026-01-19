@@ -1,74 +1,74 @@
 
 
-## Connect Domain Filter to Dashboard
+## Add "Add New Startups" Button to Settings Page
 
 ### Overview
-Wire up the domain filter dropdown in ScoringConfigurator to actually filter the clusters and startups displayed in the dashboard. When users select domains (e.g., "Fintech", "SaaS & Software"), only clusters and startups matching those domains will be shown.
+Add a second button alongside "Re-analyze Startups" in the settings page that allows users to upload new startup data without clearing their existing data. When clicked, it will prompt the user with a file upload dialog.
 
-### Current State
-- **ScoringConfigurator** already has domain filter UI with `selectedDomains` and `onDomainsChange` props
-- **Index.tsx** renders the ScoringConfigurator but doesn't pass the domain props
-- **HierarchicalClusters** and **EnhancedStartupsTable** don't currently receive filtered data
+### Current Behavior
+When users have saved startups, they see:
+- "You have X saved startups" header with "Clear Data" button
+- A single "Re-analyze Startups" button
 
-### Domain Mapping
-The domain options need to map to parent categories:
+### New Behavior
+When users have saved startups, they will see:
+- "You have X saved startups" header with "Clear Data" button  
+- **Two action buttons side by side:**
+  1. "Re-analyze Startups" - existing functionality
+  2. "Add New Startups" - opens file upload dialog
 
-| Domain Option (scoring-config) | Parent Category (types.ts) |
-|-------------------------------|---------------------------|
-| `hardware-robotics` | `hardware` |
-| `saas-software` | `saas` |
-| `deeptech` | `deeptech` |
-| `fintech` | `fintech` |
-| `biotech-health` | `biotech` |
-| `climate-energy` | `climate` |
-| `marketplace` | `marketplace` |
-| `other` | `other` |
+### Implementation Details
 
-### Implementation Steps
+#### 1. Add state for file upload dialog
+- Add `showFileUploader` state to control visibility of file uploader
+- Add `newCsvFile` state for the new file being uploaded
 
-#### 1. Add domain state to Index.tsx
-- Create `selectedDomains` state in Index.tsx
-- Pass `selectedDomains` and `onDomainsChange` to ScoringConfigurator
-- Persist domain selections to localStorage (like scoring config)
+#### 2. Create file upload dialog/section
+- When "Add New Startups" is clicked, show the FileUploader component
+- Add a handler to process the new CSV and merge with existing startups
 
-#### 2. Create domain-to-category mapping utility
-- Add a helper function in `scoring-config.ts` to map domain values to ParentCategory values
-- Example: `'biotech-health'` maps to `'biotech'`
+#### 3. Update the UI layout
+- Change the single button to a flex row with two buttons
+- "Re-analyze Startups" button (primary style)
+- "Add New Startups" button (outline style with Plus/Upload icon)
 
-#### 3. Filter clusters based on selected domains
-- In Index.tsx, create a `filteredClusters` computed value
-- If no domains selected, show all clusters
-- If domains selected, filter clusters where `parentCategory` matches any selected domain
+#### 4. Handle new startup upload
+- Parse the uploaded CSV
+- Merge with existing `savedStartups` (avoiding duplicates by name/website)
+- Save the combined list to the database
+- Optionally auto-run analysis on the updated list
 
-#### 4. Filter startups based on filtered clusters
-- Create `filteredStartupMatches` that only includes startups matching the filtered clusters
-- Startups match if any of their cluster matches are in the filtered clusters list
+### UI Design (matching screenshot style)
+```
+┌─────────────────────────────────────────────────────────────┐
+│  You have 20 saved startups        [🗑 Clear Data]          │
+│  Results available in Dashboard                             │
+├─────────────────────────────────────────────────────────────┤
+│  [Processing Status if active]                              │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │         [✨ Re-analyze Startups]                        ││
+│  └─────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │         [+ Add New Startups]                            ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
 
-#### 5. Pass filtered data to dashboard components
-- Pass `filteredClusters` to HierarchicalClusters
-- Pass `filteredStartupMatches` to EnhancedStartupsTable
-- Update StatsCards if needed to show filtered counts
-
-#### 6. Add visual feedback
-- Show active filter indicator in the dashboard header
-- Add a "Clear Filters" button when domains are selected
+When "Add New Startups" is clicked, the FileUploader component appears below or in a dialog, allowing drag-and-drop or file selection.
 
 ### File Changes
 
-#### src/lib/scoring-config.ts
-- Add `domainToParentCategory` mapping function
-
 #### src/pages/Index.tsx
-- Add `selectedDomains` state with localStorage persistence
-- Add filtering logic using `useMemo`
-- Pass domain props to ScoringConfigurator
-- Pass filtered data to dashboard components
-- Add filter indicator in dashboard view
+- Add `showAddStartups` state to toggle the file uploader visibility
+- Add `handleAddNewStartups` function to process new CSV and merge with existing startups
+- Update the button section to show two buttons
+- Conditionally render FileUploader when `showAddStartups` is true
+- Add cancel/close button to hide the uploader
 
 ### Critical Files for Implementation
-- `src/pages/Index.tsx` - Main orchestration: state, filtering logic, passing filtered data
-- `src/lib/scoring-config.ts` - Add domain-to-category mapping utility
-- `src/components/ScoringConfigurator.tsx` - Already has UI, just needs props passed
-- `src/lib/types.ts` - Reference for ParentCategory type definitions
-- `src/components/HierarchicalClusters.tsx` - Will receive filtered clusters (no changes needed)
+- `src/pages/Index.tsx` - Main page: add state, handlers, and UI for the new button
+- `src/components/FileUploader.tsx` - Existing component to reuse for file selection
+- `src/lib/api.ts` - Reference for `parseCSV` and `saveUserStartups` functions
+- `src/components/ProcessingStatus.tsx` - Existing component for showing upload/processing status
 
