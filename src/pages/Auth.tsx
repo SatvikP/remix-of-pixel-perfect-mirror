@@ -178,7 +178,7 @@ const Auth = () => {
           </div>
 
           {/* Footer Text */}
-          <p className="text-sm text-white/60 pt-4">
+          <p className="text-base text-white/60 pt-4">
             Built for Seed-Series A VCs tracking 500+ startups.
           </p>
         </div>
