@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,7 +7,9 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { ClusterBadge } from './ClusterBadge';
+import { EmailComposer } from './EmailComposer';
 import type { StartupClusterMatch } from '@/lib/types';
 import { SCORING_WEIGHTS_BY_TYPE, SCORING_WEIGHTS_BY_MATURITY } from '@/lib/types';
 import { 
@@ -20,7 +23,8 @@ import {
   DollarSign,
   Building,
   Flame,
-  Info
+  Info,
+  Mail
 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -71,6 +75,8 @@ const businessTypeLabels: Record<string, string> = {
 };
 
 export function StartupDetailModal({ match, open, onClose }: StartupDetailModalProps) {
+  const [showEmailComposer, setShowEmailComposer] = useState(false);
+  
   if (!match) return null;
 
   const { startup, clusters, investmentScore, trendCorrelation, scoreBreakdown } = match;
@@ -131,7 +137,7 @@ export function StartupDetailModal({ match, open, onClose }: StartupDetailModalP
           )}
 
           {/* Links */}
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-3">
             {startup.website && (
               <a
                 href={startup.website.startsWith('http') ? startup.website : `https://${startup.website}`}
@@ -154,7 +160,23 @@ export function StartupDetailModal({ match, open, onClose }: StartupDetailModalP
                 LinkedIn
               </a>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowEmailComposer(true)}
+              className="gap-1.5"
+            >
+              <Mail className="h-4 w-4" />
+              Send Email
+            </Button>
           </div>
+
+          {/* Email Composer Dialog */}
+          <EmailComposer
+            match={match}
+            open={showEmailComposer}
+            onClose={() => setShowEmailComposer(false)}
+          />
 
           <Separator />
 
