@@ -22,6 +22,7 @@ export interface ScrapedArticle {
 export interface Startup {
   name: string;
   website?: string;
+  email?: string; // Founder contact email
   tags?: string;
   linkedin?: string;
   // Extended info from VC feedback

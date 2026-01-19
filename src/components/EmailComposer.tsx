@@ -10,10 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Mail, Send, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Mail, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { sendOutreachEmail } from '@/lib/api';
 import type { StartupClusterMatch } from '@/lib/types';
+
+// Default emails
+const DEFAULT_FOUNDER_EMAIL = 'alexandroskou99@gmail.com';
+const DEFAULT_VC_EMAIL = 'satvikputi@gmail.com';
+const DEFAULT_VC_NAME = 'Satvik';
 
 interface EmailComposerProps {
   match: StartupClusterMatch;
@@ -58,20 +63,23 @@ function generateEmailDraft(match: StartupClusterMatch): {
   }
   
   body += `Looking forward to connecting.\n\n`;
-  body += `Best regards,\n[Your Name]`;
+  body += `Best regards,\n${DEFAULT_VC_NAME}`;
 
   return { subject, body };
 }
 
 export function EmailComposer({ match, open, onClose }: EmailComposerProps) {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
   
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [senderName, setSenderName] = useState('');
-  const [replyTo, setReplyTo] = useState('');
+  const [senderName, setSenderName] = useState(DEFAULT_VC_NAME);
+  const [replyTo, setReplyTo] = useState(DEFAULT_VC_EMAIL);
+
+  // Check if email was found in CSV data
+  const hasEmailFromData = Boolean(match.startup.email);
+  const emailSource = hasEmailFromData ? 'csv' : 'default';
 
   // Generate draft when modal opens
   useEffect(() => {
@@ -79,11 +87,14 @@ export function EmailComposer({ match, open, onClose }: EmailComposerProps) {
       const draft = generateEmailDraft(match);
       setSubject(draft.subject);
       setBody(draft.body);
-      setTo('');
+      // Pre-fill with CSV email if available, otherwise use default
+      setTo(match.startup.email || DEFAULT_FOUNDER_EMAIL);
+      setSenderName(DEFAULT_VC_NAME);
+      setReplyTo(DEFAULT_VC_EMAIL);
     }
   }, [open, match]);
 
-  const handleSend = async () => {
+  const handleOpenInEmailClient = () => {
     if (!to || !subject || !body) {
       toast({
         title: "Missing fields",
@@ -104,37 +115,18 @@ export function EmailComposer({ match, open, onClose }: EmailComposerProps) {
       return;
     }
 
-    setIsLoading(true);
+    // Generate mailto: link with pre-filled content
+    const mailtoLink = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open in new tab/window (will trigger email client)
+    window.open(mailtoLink, '_blank');
 
-    try {
-      const result = await sendOutreachEmail({
-        to,
-        subject,
-        body,
-        senderName: senderName || 'Investor',
-        replyTo,
-        startupName: match.startup.name,
-      });
+    toast({
+      title: "Opening email client...",
+      description: `Composing email to ${match.startup.name}`,
+    });
 
-      if (result.success) {
-        toast({
-          title: "Email sent!",
-          description: `Your message to ${match.startup.name} has been sent.`,
-        });
-        onClose();
-      } else {
-        throw new Error(result.error || 'Failed to send email');
-      }
-    } catch (error: any) {
-      console.error('Email send error:', error);
-      toast({
-        title: "Failed to send",
-        description: error.message || "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    onClose();
   };
 
   return (
@@ -148,6 +140,21 @@ export function EmailComposer({ match, open, onClose }: EmailComposerProps) {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Email source indicator */}
+          <div className="flex items-center gap-2">
+            {emailSource === 'csv' ? (
+              <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Email found in your data
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Using default email
+              </Badge>
+            )}
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="to">To</Label>
             <Input
@@ -202,24 +209,19 @@ export function EmailComposer({ match, open, onClose }: EmailComposerProps) {
               />
             </div>
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            This will open your default email client with the message pre-filled.
+          </p>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSend} disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              <>
-                <Send className="mr-2 h-4 w-4" />
-                Send Email
-              </>
-            )}
+          <Button onClick={handleOpenInEmailClient}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Open in Email Client
           </Button>
         </DialogFooter>
       </DialogContent>
