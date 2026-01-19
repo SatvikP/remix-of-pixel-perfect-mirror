@@ -1,148 +1,116 @@
 
 
-## One-Click Email Feature for Startup Modal
+## Plan: Add "Try Demo" Onboarding for New Users
 
 ### Overview
-Add a "Send Email" button to the StartupDetailModal that allows users to send a pre-drafted investment inquiry email directly from the app without leaving the page.
+When new users (who have no saved startups) land on the Settings page, instead of only showing a CSV uploader, we'll display a compelling "Try Demo" option that instantly loads 100 curated stealth startups. This lets VCs experience the full power of FundRadar without friction.
 
-### Prerequisites
-- **Resend API Key**: Required for sending emails
-  - Sign up at https://resend.com
-  - Validate your domain at https://resend.com/domains
-  - Create API key at https://resend.com/api-keys
+### New User Experience Flow
 
-### Architecture
-
+**Before (Current):**
 ```
-User clicks "Send Email" button
-        ↓
-Modal shows email composer with pre-filled draft
-        ↓
-User edits/confirms and clicks "Send"
-        ↓
-Frontend calls send-outreach-email edge function
-        ↓
-Edge function uses Resend API to send email
-        ↓
-Success toast shown to user
+Sign up → Settings → See empty CSV uploader → ???
 ```
 
-### Implementation Steps
-
-#### 1. Add RESEND_API_KEY Secret
-- Use the add_secret tool to request the Resend API key from the user
-- This secret will be available in the edge function
-
-#### 2. Create Edge Function: send-outreach-email
-**File:** `supabase/functions/send-outreach-email/index.ts`
-
-The edge function will:
-- Accept: recipient email, subject, body, startup name
-- Use Resend SDK to send the email
-- Return success/failure status
-
-```typescript
-// Edge function structure
-- Imports (Resend SDK)
-- CORS headers
-- Handler that sends email via Resend
-- Error handling and logging
+**After (Proposed):**
+```
+Sign up → Settings → See "Try Demo" + "Upload Your Own" options
+        ↓
+   Click "Try Demo"
+        ↓
+   100 demo startups loaded → Auto-analyze → Dashboard with results
 ```
 
-#### 3. Create Email Composer Component
-**File:** `src/components/EmailComposer.tsx`
+### Implementation Details
 
-A dialog component that:
-- Takes startup data as props
-- Pre-generates an email draft based on startup info
-- Allows user to edit recipient, subject, and body
-- Has "Send" and "Cancel" buttons
-- Shows loading state while sending
-- Displays success/error feedback
+#### 1. Add Demo Data File
+**File:** `src/data/demo_startups.json`
 
-**Draft Email Template:**
+Convert the uploaded CSV to a JSON file containing 100 stealth startups with:
+- Startup Name (name)
+- Tagline (blurb) 
+- Founder LinkedIn (linkedin)
+- Keyword Tags (tags)
+
+This keeps the demo data bundled with the app for instant loading.
+
+#### 2. Update Settings View in Index.tsx
+**File:** `src/pages/Index.tsx`
+
+Replace the current empty-state uploader with a two-option layout:
+
 ```
-Subject: Investment Inquiry - [Startup Name]
-
-Hi,
-
-I came across [Startup Name] and was impressed by your work in [matched trends].
-
-[Personalized content based on startup data: blurb, market, value prop]
-
-I'd love to schedule a call to learn more about your vision and discuss potential investment opportunities.
-
-Best regards,
-[Sender name - from user profile or editable field]
+┌─────────────────────────────────────────────────────────┐
+│                   Get Started                            │
+│                                                          │
+│  ┌─────────────────────┐   ┌─────────────────────────┐  │
+│  │  🚀 Try Demo         │   │  📤 Upload Your Own     │  │
+│  │                      │   │                         │  │
+│  │  100 stealth founders│   │  Already have a list?   │  │
+│  │  across 6 sectors    │   │  Upload your CSV        │  │
+│  │                      │   │                         │  │
+│  │  [Load Demo Data]    │   │  [Upload CSV]           │  │
+│  └─────────────────────┘   └─────────────────────────┘  │
+│                                                          │
+│  ✓ SaaS, Biotech, DeepTech, Fintech, Food, Hardware     │
+│  ✓ See trend clustering in action                       │
+│  ✓ Explore filtering, scoring, and outreach             │
+└─────────────────────────────────────────────────────────┘
 ```
 
-#### 4. Update StartupDetailModal
-**File:** `src/components/StartupDetailModal.tsx`
+**Key UI Changes:**
+- Add a `loadDemoData()` function that imports the demo JSON
+- Add loading state while demo data processes
+- Show a subtle badge on demo data indicating it's sample data
+- After loading demo, auto-trigger analysis and switch to Dashboard
 
-Changes:
-- Add "Send Email" button (with Mail icon) in the Links section
-- Add state to control email composer visibility
-- Pass startup data to EmailComposer component
-
-#### 5. Add API Integration Function
+#### 3. Add Helper Function in api.ts
 **File:** `src/lib/api.ts`
 
-Add function to call the edge function:
+Add a function to save demo startups (same as CSV save but marks as demo):
 ```typescript
-export async function sendOutreachEmail(data: {
-  to: string;
-  subject: string;
-  body: string;
-  startupName: string;
-}): Promise<{ success: boolean; error?: string }>
+export async function loadDemoStartups(): Promise<Startup[]> {
+  // Import demo data
+  // Save to user_startups table
+  // Return the startups array
+}
 ```
 
-### UI Design
+#### 4. Visual Indicators
+When using demo data, show a small banner:
+```
+🧪 You're viewing demo data. Upload your own startups for personalized insights.
+   [Upload My Startups] [Clear Demo]
+```
 
-**In StartupDetailModal (Links section):**
-```
-[🔗 Website]  [💼 LinkedIn]  [✉️ Send Email]
-```
-
-**Email Composer Dialog:**
-```
-┌─────────────────────────────────────────────────────┐
-│  📧 Email Outreach                              [X] │
-├─────────────────────────────────────────────────────┤
-│  To:      [recipient@startup.com____________]       │
-│  Subject: [Investment Inquiry - NutriSensor__]      │
-│                                                     │
-│  ┌─────────────────────────────────────────────┐   │
-│  │ Hi,                                         │   │
-│  │                                              │   │
-│  │ I came across NutriSensor and was           │   │
-│  │ impressed by your work in Precision         │   │
-│  │ Health & Bio-Sensing Wearables...           │   │
-│  │                                              │   │
-│  │ [Editable textarea with full draft]         │   │
-│  └─────────────────────────────────────────────┘   │
-│                                                     │
-│  From: [Your Name (editable)__________________]     │
-│  Reply-to: [your@email.com___________________]      │
-│                                                     │
-│                      [Cancel]  [📤 Send Email]      │
-└─────────────────────────────────────────────────────┘
-```
+This encourages users to eventually upload real data while letting them explore freely.
 
 ### File Changes Summary
 
 | File | Change |
 |------|--------|
-| `supabase/functions/send-outreach-email/index.ts` | **New** - Edge function for sending emails via Resend |
-| `supabase/config.toml` | Update - Add new edge function config |
-| `src/components/EmailComposer.tsx` | **New** - Email composition dialog component |
-| `src/components/StartupDetailModal.tsx` | Update - Add email button and composer integration |
-| `src/lib/api.ts` | Update - Add sendOutreachEmail function |
+| `src/data/demo_startups.json` | **NEW** - Demo startup data (100 entries) |
+| `src/pages/Index.tsx` | Add demo loading option, two-column layout for new users |
+| `src/lib/api.ts` | Add `loadDemoStartups()` helper function |
+
+### User Journey
+
+1. **New User Signs Up** → Lands on Settings page
+2. **Sees Two Options**: "Try Demo" (prominent) and "Upload Your Own" (secondary)
+3. **Clicks "Try Demo"** → 100 startups load instantly
+4. **Auto-Analysis Runs** → Dashboard populates with clusters
+5. **Explores Features**: Filtering, scoring, email outreach
+6. **Gets Hooked** → Uploads their own CRM data
+
+### Benefits
+
+- **Zero friction onboarding**: One click to see value
+- **Showcases full power**: Clustering, filtering, outreach all visible
+- **Builds trust**: VCs see results before sharing their data
+- **Reduces drop-off**: No CSV knowledge required upfront
 
 ### Critical Files for Implementation
-- `supabase/functions/send-outreach-email/index.ts` - Edge function to send emails via Resend API
-- `src/components/EmailComposer.tsx` - New component for composing and sending emails
-- `src/components/StartupDetailModal.tsx` - Add email button and integrate composer
-- `src/lib/api.ts` - Add API function to call the edge function
-- `supabase/config.toml` - Register the new edge function
+- `src/pages/Index.tsx` - Add demo loading UI and logic for new users
+- `src/data/demo_startups.json` - Demo startup data (100 entries from uploaded CSV)
+- `src/lib/api.ts` - Helper function to load and save demo startups
 
