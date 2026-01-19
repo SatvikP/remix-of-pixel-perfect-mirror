@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -181,6 +181,14 @@ const Auth = () => {
           <p className="text-base text-white/60 pt-4">
             Built for Seed-Series A VCs tracking 500+ startups.
           </p>
+
+          {/* Story Link */}
+          <Link 
+            to="/story" 
+            className="inline-block text-sm text-white/70 hover:text-white underline underline-offset-4 transition-colors"
+          >
+            Read our story →
+          </Link>
         </div>
       </div>;
   }
