@@ -13,12 +13,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Mail, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import type { StartupClusterMatch } from '@/lib/types';
-
-// Default emails
-const DEFAULT_FOUNDER_EMAIL = 'alexandroskou99@gmail.com';
-const DEFAULT_VC_EMAIL = 'satvikputi@gmail.com';
-const DEFAULT_VC_NAME = 'Satvik';
 
 interface EmailComposerProps {
   match: StartupClusterMatch;
@@ -26,7 +22,7 @@ interface EmailComposerProps {
   onClose: () => void;
 }
 
-function generateEmailDraft(match: StartupClusterMatch): {
+function generateEmailDraft(match: StartupClusterMatch, senderName: string): {
   subject: string;
   body: string;
 } {
@@ -63,7 +59,7 @@ function generateEmailDraft(match: StartupClusterMatch): {
   }
   
   body += `Looking forward to connecting.\n\n`;
-  body += `Best regards,\n${DEFAULT_VC_NAME}`;
+  body += `Best regards,\n${senderName || '[Your Name]'}`;
 
   return { subject, body };
 }
@@ -74,25 +70,36 @@ export function EmailComposer({ match, open, onClose }: EmailComposerProps) {
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
-  const [senderName, setSenderName] = useState(DEFAULT_VC_NAME);
-  const [replyTo, setReplyTo] = useState(DEFAULT_VC_EMAIL);
+  const [senderName, setSenderName] = useState('');
+  const [replyTo, setReplyTo] = useState('');
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   // Check if email was found in CSV data
   const hasEmailFromData = Boolean(match.startup.email);
-  const emailSource = hasEmailFromData ? 'csv' : 'default';
+
+  // Load current user's email on mount
+  useEffect(() => {
+    async function loadUserEmail() {
+      setIsLoadingUser(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setReplyTo(user.email);
+      }
+      setIsLoadingUser(false);
+    }
+    loadUserEmail();
+  }, []);
 
   // Generate draft when modal opens
   useEffect(() => {
     if (open && match) {
-      const draft = generateEmailDraft(match);
+      const draft = generateEmailDraft(match, senderName);
       setSubject(draft.subject);
       setBody(draft.body);
-      // Pre-fill with CSV email if available, otherwise use default
-      setTo(match.startup.email || DEFAULT_FOUNDER_EMAIL);
-      setSenderName(DEFAULT_VC_NAME);
-      setReplyTo(DEFAULT_VC_EMAIL);
+      // Only pre-fill if email exists in CSV data
+      setTo(match.startup.email || '');
     }
-  }, [open, match]);
+  }, [open, match, senderName]);
 
   const handleOpenInEmailClient = () => {
     if (!to || !subject || !body) {
@@ -142,7 +149,7 @@ export function EmailComposer({ match, open, onClose }: EmailComposerProps) {
         <div className="space-y-4 py-4">
           {/* Email source indicator */}
           <div className="flex items-center gap-2">
-            {emailSource === 'csv' ? (
+            {hasEmailFromData ? (
               <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Email found in your data
@@ -150,7 +157,7 @@ export function EmailComposer({ match, open, onClose }: EmailComposerProps) {
             ) : (
               <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
                 <AlertCircle className="h-3 w-3 mr-1" />
-                Using default email
+                No email found in CSV - please enter manually
               </Badge>
             )}
           </div>
