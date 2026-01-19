@@ -17,6 +17,20 @@ export interface ScoringConfig {
   normalizeWeights: boolean; // If true, weights are normalized to 100%
 }
 
+// Domain options for filtering
+export const DOMAIN_OPTIONS = [
+  { value: 'hardware-robotics', label: 'Hardware & Robotics' },
+  { value: 'saas-software', label: 'SaaS & Software' },
+  { value: 'deeptech', label: 'DeepTech' },
+  { value: 'fintech', label: 'Fintech' },
+  { value: 'biotech-health', label: 'Biotech & Health' },
+  { value: 'climate-energy', label: 'Climate & Energy' },
+  { value: 'marketplace', label: 'Marketplace' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export type DomainOption = typeof DOMAIN_OPTIONS[number]['value'];
+
 // Market-focused metrics (derived from articles/trends)
 export const MARKET_METRICS: ScoringMetric[] = [
   {
@@ -64,15 +78,15 @@ export const MARKET_METRICS: ScoringMetric[] = [
     maxPoints: 10,
   },
   {
-    id: 'competitiveDensity',
-    name: 'Competitive Density',
-    description: 'Number of similar startups in trend clusters (inverse - less is better)',
-    detailedInfo: 'Measures how crowded the startup\'s space is. Lower competition can indicate first-mover advantage, while high competition might suggest a saturated market. Score is inversely proportional to density.',
-    example: 'A quantum computing startup in a niche cluster with few competitors would score higher than one in crowded SaaS.',
+    id: 'marketSize',
+    name: 'Market Size',
+    description: 'Filter by minimum market size threshold',
+    detailedInfo: 'Sets a minimum Total Addressable Market (TAM) threshold for startups. Only startups operating in markets above this threshold will receive full points. Markets are estimated based on sector analysis.',
+    example: 'Setting $500B minimum would favor startups in large markets like enterprise software over niche verticals.',
     category: 'market',
     enabled: false,
-    weight: 5,
-    maxPoints: 5,
+    weight: 10,
+    maxPoints: 10,
   },
 ];
 
@@ -142,34 +156,6 @@ export const TREND_METRICS: ScoringMetric[] = [
 export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
   metrics: [...MARKET_METRICS, ...STARTUP_METRICS, ...TREND_METRICS],
   normalizeWeights: true,
-};
-
-// Preset configurations
-export const SCORING_PRESETS: Record<string, ScoringConfig> = {
-  'market-focused': {
-    metrics: [
-      ...MARKET_METRICS.map(m => ({ ...m, enabled: true })),
-      ...STARTUP_METRICS.map(m => ({ ...m, enabled: false })),
-      ...TREND_METRICS.map(m => ({ ...m, enabled: true })),
-    ],
-    normalizeWeights: true,
-  },
-  'balanced': {
-    metrics: [
-      ...MARKET_METRICS.map(m => ({ ...m, enabled: true, weight: m.weight * 0.5 })),
-      ...STARTUP_METRICS.map(m => ({ ...m, enabled: true, weight: m.weight * 0.5 })),
-      ...TREND_METRICS.map(m => ({ ...m, enabled: true })),
-    ],
-    normalizeWeights: true,
-  },
-  'startup-focused': {
-    metrics: [
-      ...MARKET_METRICS.map(m => ({ ...m, enabled: true, weight: m.weight * 0.3 })),
-      ...STARTUP_METRICS.map(m => ({ ...m, enabled: true, weight: m.weight * 1.5 })),
-      ...TREND_METRICS.map(m => ({ ...m, enabled: true })),
-    ],
-    normalizeWeights: true,
-  },
 };
 
 // Helper to normalize weights to 100%
