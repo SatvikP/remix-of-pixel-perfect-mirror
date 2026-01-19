@@ -1,8 +1,21 @@
-import { Link } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Quote, Target, Mail, Filter, Eye, Linkedin, MessageSquare, Database, Clock, Users, Zap } from 'lucide-react';
+import { Link } from "react-router-dom";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  ArrowLeft,
+  Quote,
+  Target,
+  Mail,
+  Filter,
+  Eye,
+  Linkedin,
+  MessageSquare,
+  Database,
+  Clock,
+  Users,
+  Zap,
+} from "lucide-react";
 interface Collaborator {
   name: string;
   role: string;
@@ -10,75 +23,98 @@ interface Collaborator {
   quote: string;
   linkedinUrl?: string;
 }
-const collaborators: Collaborator[] = [{
-  name: "Antoine Duchein",
-  role: "Operations",
-  organization: "Entrepreneurs First",
-  quote: "As a VC I'd like actionable ways to reach out to startups directly — WhatsApp if I have their numbers, or email + a draft of what I should send — within this kind of dashboard.",
-  linkedinUrl: "https://linkedin.com"
-}, {
-  name: "Gaëtan Lavigne",
-  role: "VC Associate",
-  organization: "Asterion Ventures",
-  quote: "In pre-seed/seed, we want to see projects before there's a website. When they are in stealth mode the relationship must be established as early as possible."
-}, {
-  name: "Pierina Camarena",
-  role: "AI Engineer & VC Scout",
-  organization: "Aleph Venture Studio / EWOR",
-  quote: "Would love to see market growth of certain domains and ranking of quality of sources. VCs already know the basics of how their domain is doing."
-}, {
-  name: "Titouan Galpin & Tristan Camilli",
-  role: "Founders",
-  organization: "Luphy (Tech solutions for VCs)",
-  quote: "Already send emails via CRM — need that integrated directly into the dashboard for seamless outreach."
-}];
-const vcInsights = [{
-  quote: "Actionable outreach matters more than rankings",
-  emphasis: "Action over scores"
-}, {
-  quote: "We want to see startups before they have a website",
-  emphasis: "Stealth-stage access"
-}, {
-  quote: "Human context > quantitative scores at seed",
-  emphasis: "Relationship-first"
-}, {
-  quote: "The rating system differs from one type of business to another",
-  emphasis: "Context-aware scoring"
-}];
-const painPoints = [{
-  icon: Database,
-  text: "Data scattered across tools"
-}, {
-  icon: Clock,
-  text: "CRM goes stale quickly"
-}, {
-  icon: Mail,
-  text: "Outreach is manual and slow"
-}, {
-  icon: Users,
-  text: "Context lost between platforms"
-}, {
-  icon: Zap,
-  text: "Good startups contacted too late"
-}];
-const capabilities = [{
-  icon: Filter,
-  title: "Focused Filtering",
-  description: "Sector-first approach — biotech, fintech, climate. Stage-aware filtering from stealth to Series A.",
-  features: ["Domain-specific views", "Maturity filtering", "Location-based search"]
-}, {
-  icon: Eye,
-  title: "Contextual Startup View",
-  description: "Everything you need at a glance: blurb, maturity, location, founder LinkedIn, one-pager logic.",
-  features: ["Founder profiles", "Key metrics", "Investment thesis fit"]
-}, {
-  icon: MessageSquare,
-  title: "One-Click Outreach",
-  description: "Email or WhatsApp with pre-filled drafts. Send directly from the dashboard, no context switching.",
-  features: ["Pre-drafted messages", "Direct send", "Personalized context"]
-}];
+const collaborators: Collaborator[] = [
+  {
+    name: "Antoine Duchein",
+    role: "Operations",
+    organization: "Entrepreneurs First",
+    quote:
+      "As a VC I'd like actionable ways to reach out to startups directly — WhatsApp if I have their numbers, or email + a draft of what I should send — within this kind of dashboard.",
+  },
+  {
+    name: "Gaëtan Lavigne",
+    role: "VC Associate",
+    organization: "Asterion Ventures",
+    quote:
+      "In pre-seed/seed, we want to see projects before there's a website. When they are in stealth mode the relationship must be established as early as possible.",
+  },
+  {
+    name: "Pierina Camarena",
+    role: "AI Engineer & VC Scout",
+    organization: "Aleph Venture Studio / EWOR",
+    quote:
+      "Would love to see market growth of certain domains and ranking of quality of sources. VCs already know the basics of how their domain is doing.",
+  },
+  {
+    name: "Titouan Galpin & Tristan Camilli",
+    role: "Founders",
+    organization: "Luphy (Tech solutions for VCs)",
+    quote: "Already send emails via CRM — need that integrated directly into the dashboard for seamless outreach.",
+  },
+];
+const vcInsights = [
+  {
+    quote: "Actionable outreach matters more than rankings",
+    emphasis: "Action over scores",
+  },
+  {
+    quote: "We want to see startups before they have a website",
+    emphasis: "Stealth-stage access",
+  },
+  {
+    quote: "Human context > quantitative scores at seed",
+    emphasis: "Relationship-first",
+  },
+  {
+    quote: "The rating system differs from one type of business to another",
+    emphasis: "Context-aware scoring",
+  },
+];
+const painPoints = [
+  {
+    icon: Database,
+    text: "Data scattered across tools",
+  },
+  {
+    icon: Clock,
+    text: "CRM goes stale quickly",
+  },
+  {
+    icon: Mail,
+    text: "Outreach is manual and slow",
+  },
+  {
+    icon: Users,
+    text: "Context lost between platforms",
+  },
+  {
+    icon: Zap,
+    text: "Good startups contacted too late",
+  },
+];
+const capabilities = [
+  {
+    icon: Filter,
+    title: "Focused Filtering",
+    description: "Sector-first approach — biotech, fintech, climate. Stage-aware filtering from stealth to Series A.",
+    features: ["Domain-specific views", "Maturity filtering", "Location-based search"],
+  },
+  {
+    icon: Eye,
+    title: "Contextual Startup View",
+    description: "Everything you need at a glance: blurb, maturity, location, founder LinkedIn, one-pager logic.",
+    features: ["Founder profiles", "Key metrics", "Investment thesis fit"],
+  },
+  {
+    icon: MessageSquare,
+    title: "One-Click Outreach",
+    description: "Email or WhatsApp with pre-filled drafts. Send directly from the dashboard, no context switching.",
+    features: ["Pre-drafted messages", "Direct send", "Personalized context"],
+  },
+];
 export default function Story() {
-  return <div className="min-h-screen bg-gradient-to-br from-[hsl(245,60%,6%)] via-[hsl(245,50%,10%)] to-[hsl(240,50%,15%)]">
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[hsl(245,60%,6%)] via-[hsl(245,50%,10%)] to-[hsl(240,50%,15%)]">
       {/* Navigation */}
       <header className="border-b border-white/10 backdrop-blur-md bg-white/5">
         <div className="container py-4">
@@ -99,12 +135,17 @@ export default function Story() {
             Our Story
           </Badge>
           <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
-            Built <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">With VCs</span>,
-            <br />For VCs
+            Built{" "}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400">
+              With VCs
+            </span>
+            ,
+            <br />
+            For VCs
           </h1>
           <p className="text-lg text-white/60 max-w-2xl mx-auto">
-            It all started with a request from a VC friend and grew into a collaborative co-build 
-            with investors across Europe. This is how we're reshaping deal flow.
+            It all started with a request from a VC friend and grew into a collaborative co-build with investors across
+            Europe. This is how we're reshaping deal flow.
           </p>
         </section>
 
@@ -114,9 +155,13 @@ export default function Story() {
             <h2 className="text-3xl font-bold text-white">What VCs Told Us</h2>
             <p className="text-white/50">We didn't invent this in isolation. We listened.</p>
           </div>
-          
+
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {vcInsights.map((insight, index) => <Card key={index} className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300">
+            {vcInsights.map((insight, index) => (
+              <Card
+                key={index}
+                className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
+              >
                 <CardContent className="p-6 space-y-4">
                   <Quote className="h-8 w-8 text-indigo-400/50" />
                   <p className="text-white/90 text-lg italic">"{insight.quote}"</p>
@@ -124,7 +169,8 @@ export default function Story() {
                     {insight.emphasis}
                   </Badge>
                 </CardContent>
-              </Card>)}
+              </Card>
+            ))}
           </div>
         </section>
 
@@ -144,12 +190,14 @@ export default function Story() {
                   "Who should I reach out to <span className="text-indigo-400">this week</span> — and why?"
                 </p>
               </div>
-              
+
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {painPoints.map((point, index) => <div key={index} className="flex items-center gap-3 p-4 rounded-lg bg-white/5 border border-white/10">
+                {painPoints.map((point, index) => (
+                  <div key={index} className="flex items-center gap-3 p-4 rounded-lg bg-white/5 border border-white/10">
                     <point.icon className="h-5 w-5 text-red-400/80 shrink-0" />
                     <span className="text-white/70 text-sm">{point.text}</span>
-                  </div>)}
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -163,7 +211,11 @@ export default function Story() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {capabilities.map((capability, index) => <Card key={index} className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 hover:border-indigo-500/30 transition-all duration-300 group">
+            {capabilities.map((capability, index) => (
+              <Card
+                key={index}
+                className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 hover:border-indigo-500/30 transition-all duration-300 group"
+              >
                 <CardContent className="p-6 space-y-4">
                   <div className="p-3 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 w-fit group-hover:from-indigo-500/30 group-hover:to-purple-500/30 transition-all">
                     <capability.icon className="h-6 w-6 text-indigo-400" />
@@ -171,13 +223,16 @@ export default function Story() {
                   <h3 className="text-xl font-semibold text-white">{capability.title}</h3>
                   <p className="text-white/60 text-sm leading-relaxed">{capability.description}</p>
                   <ul className="space-y-2">
-                    {capability.features.map((feature, fIndex) => <li key={fIndex} className="flex items-center gap-2 text-sm text-white/50">
+                    {capability.features.map((feature, fIndex) => (
+                      <li key={fIndex} className="flex items-center gap-2 text-sm text-white/50">
                         <div className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
                         {feature}
-                      </li>)}
+                      </li>
+                    ))}
                   </ul>
                 </CardContent>
-              </Card>)}
+              </Card>
+            ))}
           </div>
         </section>
 
@@ -189,7 +244,11 @@ export default function Story() {
           </div>
 
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {collaborators.map((collaborator, index) => <Card key={index} className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300">
+            {collaborators.map((collaborator, index) => (
+              <Card
+                key={index}
+                className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300"
+              >
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-start justify-between">
                     <div>
@@ -200,12 +259,11 @@ export default function Story() {
                     {collaborator.linkedinUrl}
                   </div>
                   <div className="relative pl-4 border-l-2 border-indigo-500/30">
-                    <p className="text-white/70 text-sm italic leading-relaxed">
-                      "{collaborator.quote}"
-                    </p>
+                    <p className="text-white/70 text-sm italic leading-relaxed">"{collaborator.quote}"</p>
                   </div>
                 </CardContent>
-              </Card>)}
+              </Card>
+            ))}
           </div>
         </section>
 
@@ -216,15 +274,15 @@ export default function Story() {
             Join the VCs who are already discovering and reaching out to the best startups faster.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild size="lg" className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white border-none">
-              <Link to="/">
-                Try FundRadar
-              </Link>
+            <Button
+              asChild
+              size="lg"
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white border-none"
+            >
+              <Link to="/">Try FundRadar</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10">
-              <a href="mailto:hello@fundradar.com">
-                Get in Touch
-              </a>
+              <a href="mailto:hello@fundradar.com">Get in Touch</a>
             </Button>
           </div>
         </section>
@@ -236,5 +294,6 @@ export default function Story() {
           <p>© 2024 FundRadar. Built with ❤️ by VCs, for VCs.</p>
         </div>
       </footer>
-    </div>;
+    </div>
+  );
 }
