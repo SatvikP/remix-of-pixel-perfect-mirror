@@ -336,6 +336,7 @@ Return your analysis in this exact JSON format:
               mentions: [{ configurationId: DUST_AGENT_ID }],
               context: {
                 timezone: 'UTC',
+                username: 'fundradar-api',
                 profilePictureUrl: null,
                 fullName: 'FundRadar Analyst',
                 email: null,
