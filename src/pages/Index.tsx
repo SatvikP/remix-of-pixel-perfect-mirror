@@ -11,6 +11,7 @@ import { ProcessingStatus, ProcessingStep } from '@/components/ProcessingStatus'
 import { StatsCards } from '@/components/StatsCards';
 
 import { ScoringConfigurator } from '@/components/ScoringConfigurator';
+import { DomainFilter } from '@/components/DomainFilter';
 import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
 import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen, loadDemoStartups } from '@/lib/api';
@@ -724,26 +725,13 @@ export default function Index() {
           <>
             {hasResults ? (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <h2 className="text-xl font-semibold">Results</h2>
-                    {selectedDomains.length > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Filter className="h-3 w-3" />
-                          {selectedDomains.length} domain{selectedDomains.length > 1 ? 's' : ''} filtered
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                          onClick={() => handleDomainsChange([])}
-                        >
-                          <X className="h-3 w-3 mr-1" />
-                          Clear
-                        </Button>
-                      </div>
-                    )}
+                    <DomainFilter 
+                      selectedDomains={selectedDomains} 
+                      onDomainsChange={handleDomainsChange} 
+                    />
                   </div>
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={() => setActiveView('settings')}>
