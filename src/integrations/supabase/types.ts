@@ -62,8 +62,10 @@ export type Database = {
       user_profiles: {
         Row: {
           created_at: string | null
+          demo_loaded_at: string | null
           email: string | null
           first_csv_upload_at: string | null
+          has_tried_demo: boolean | null
           has_uploaded_csv: boolean | null
           id: string
           last_seen_at: string | null
@@ -72,8 +74,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          demo_loaded_at?: string | null
           email?: string | null
           first_csv_upload_at?: string | null
+          has_tried_demo?: boolean | null
           has_uploaded_csv?: boolean | null
           id?: string
           last_seen_at?: string | null
@@ -82,8 +86,10 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          demo_loaded_at?: string | null
           email?: string | null
           first_csv_upload_at?: string | null
+          has_tried_demo?: boolean | null
           has_uploaded_csv?: boolean | null
           id?: string
           last_seen_at?: string | null
