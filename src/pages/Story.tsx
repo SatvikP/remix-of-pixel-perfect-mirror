@@ -30,6 +30,7 @@ const collaborators: Collaborator[] = [
     organization: "Entrepreneurs First",
     quote:
       "As a VC I'd like actionable ways to reach out to startups directly — WhatsApp if I have their numbers, or email + a draft of what I should send — within this kind of dashboard.",
+    linkedinUrl: "https://www.linkedin.com/in/antoine-duchein/",
   },
   {
     name: "Gaëtan Lavigne",
@@ -37,6 +38,7 @@ const collaborators: Collaborator[] = [
     organization: "Asterion Ventures",
     quote:
       "In pre-seed/seed, we want to see projects before there's a website. When they are in stealth mode the relationship must be established as early as possible.",
+    linkedinUrl: "https://www.linkedin.com/in/gaetan-lavigne/",
   },
   {
     name: "Pierina Camarena",
@@ -44,12 +46,14 @@ const collaborators: Collaborator[] = [
     organization: "Aleph Studios / VC Scout - EWOR",
     quote:
       "Would love to see market growth of certain domains and ranking of quality of sources. VCs already know the basics of how their domain is doing.",
+    linkedinUrl: "https://www.linkedin.com/in/pierinacamarena/",
   },
   {
     name: "Titouan Galpin & Tristan Camilli",
     role: "Founders",
     organization: "Luphy (Tech solutions for VCs)",
     quote: "Already send emails via CRM — need that integrated directly into the dashboard for seamless outreach.",
+    linkedinUrl: "https://www.linkedin.com/company/luphy/",
   },
 ];
 const vcInsights = [
@@ -256,7 +260,16 @@ export default function Story() {
                       <p className="text-sm text-indigo-400">{collaborator.role}</p>
                       <p className="text-sm text-white/50">@{collaborator.organization}</p>
                     </div>
-                    {collaborator.linkedinUrl}
+                    {collaborator.linkedinUrl && (
+                      <a
+                        href={collaborator.linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 rounded-lg bg-white/5 hover:bg-indigo-500/20 transition-colors"
+                      >
+                        <Linkedin className="h-5 w-5 text-indigo-400" />
+                      </a>
+                    )}
                   </div>
                   <div className="relative pl-4 border-l-2 border-indigo-500/30">
                     <p className="text-white/70 text-sm italic leading-relaxed">"{collaborator.quote}"</p>
