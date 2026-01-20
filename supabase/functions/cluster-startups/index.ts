@@ -334,9 +334,24 @@ CRITICAL RULES:
     });
 
     if (!matchResponse.ok) {
-      console.error('AI matching error');
+      const errorText = await matchResponse.text();
+      console.error('AI matching error:', matchResponse.status, errorText);
+      
+      if (matchResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Rate limit exceeded during matching. Please try again later.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      if (matchResponse.status === 402) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Payment required. Please add credits to continue.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       return new Response(
-        JSON.stringify({ success: false, error: 'AI startup matching failed' }),
+        JSON.stringify({ success: false, error: `AI startup matching failed: ${matchResponse.status}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
