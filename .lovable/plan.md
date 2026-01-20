@@ -1,59 +1,78 @@
 
 
-## Fix: Add Detailed Error Logging for AI Matching Step
+## Fix Results Persistence Across Navigation
 
 ### Problem
-The current code only logs "AI matching error" without capturing the actual HTTP status code or error response body, making debugging impossible.
+When a logged-in user navigates from Dashboard to "Our Story" and back, they lose sight of their results because:
+1. The `activeView` state resets to `'settings'` on every component remount
+2. There's no URL parameter handling to restore the correct view
+3. The `result` data IS persisted in ProcessingContext, but the UI doesn't show it
 
 ### Solution
-Enhance error logging on line 336-342 of `supabase/functions/cluster-startups/index.ts` to capture and log the actual error details.
+Implement URL-based view state management using React Router's `useSearchParams`. This approach:
+- Syncs `activeView` with the URL (e.g., `/?view=dashboard`)
+- Survives page navigation and browser refresh
+- Works seamlessly with the existing notification click handlers
+- Provides shareable/bookmarkable view states
 
-### Changes
+### Implementation Details
 
-**File: `supabase/functions/cluster-startups/index.ts`**
+#### 1. Update `src/pages/Index.tsx`
 
-Replace the current error handling (lines 336-342):
+**Add URL Parameter Handling:**
 ```typescript
-if (!matchResponse.ok) {
-  console.error('AI matching error');
-  return new Response(
-    JSON.stringify({ success: false, error: 'AI startup matching failed' }),
-    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
-}
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+
+// Replace useState for activeView with URL-based state
+const [searchParams, setSearchParams] = useSearchParams();
+const viewParam = searchParams.get('view');
+
+// Derive activeView from URL, defaulting smartly based on state
+const activeView = useMemo(() => {
+  if (viewParam === 'dashboard' || viewParam === 'founders' || viewParam === 'settings') {
+    return viewParam;
+  }
+  // If result exists, default to dashboard; otherwise settings
+  return result ? 'dashboard' : 'settings';
+}, [viewParam, result]);
+
+// Create a setter function that updates URL params
+const setActiveView = useCallback((view: 'settings' | 'dashboard' | 'founders') => {
+  setSearchParams({ view });
+}, [setSearchParams]);
 ```
 
-With detailed error handling (similar to lines 197-217 for the cluster step):
+**Remove the old useState line:**
 ```typescript
-if (!matchResponse.ok) {
-  const errorText = await matchResponse.text();
-  console.error('AI matching error:', matchResponse.status, errorText);
-  
-  if (matchResponse.status === 429) {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Rate limit exceeded during matching. Please try again later.' }),
-      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-  if (matchResponse.status === 402) {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Payment required. Please add credits to continue.' }),
-      { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-  
-  return new Response(
-    JSON.stringify({ success: false, error: `AI startup matching failed: ${matchResponse.status}` }),
-    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
-}
+// DELETE THIS LINE:
+const [activeView, setActiveView] = useState<'settings' | 'dashboard' | 'founders'>('settings');
 ```
+
+**Update handleProcessStartups to use URL navigation:**
+```typescript
+// Change from:
+setActiveView('dashboard');
+// To:
+setSearchParams({ view: 'dashboard' });
+```
+
+#### 2. Update navigation buttons to use setSearchParams
+
+The existing `setActiveView` calls will work since we're replacing it with a function of the same signature.
+
+### Changes Summary
+
+| File | Changes |
+|------|---------|
+| `src/pages/Index.tsx` | Replace `useState` for `activeView` with `useSearchParams` hook, add smart defaulting logic |
 
 ### Benefits
-1. **Better debugging**: Logs will show exact HTTP status (429, 402, 500, etc.) and error message
-2. **User-friendly errors**: Different error messages for rate limits vs payment issues vs generic failures
-3. **Consistent handling**: Matches the error handling pattern already used for the clustering step (lines 197-217)
+- Results persist visually when navigating back from Story page
+- URL reflects current view state (bookmarkable)
+- Notification clicks work correctly with `/?view=dashboard`
+- Browser back/forward buttons work as expected
+- No additional API calls or re-analysis triggered
 
 ### Critical Files for Implementation
-- `supabase/functions/cluster-startups/index.ts` - Add detailed error logging at line 336-342
+- `src/pages/Index.tsx` - Main file to modify, replace activeView state management with URL-based approach
 
