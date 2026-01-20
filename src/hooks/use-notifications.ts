@@ -12,7 +12,7 @@ export function useNotifications() {
     return permission === 'granted';
   }, [isSupported]);
   
-  const sendNotification = useCallback((title: string, body?: string) => {
+  const sendNotification = useCallback((title: string, body?: string, onClickPath?: string) => {
     if (!isSupported || Notification.permission !== 'granted') return;
     
     const notification = new Notification(title, {
@@ -22,6 +22,9 @@ export function useNotifications() {
     
     notification.onclick = () => {
       window.focus();
+      if (onClickPath) {
+        window.location.href = onClickPath;
+      }
       notification.close();
     };
   }, [isSupported]);
