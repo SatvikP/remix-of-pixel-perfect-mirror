@@ -289,7 +289,7 @@ export async function fetchArticlesFromDatabase(): Promise<{
 }
 
 // Trigger a manual refresh of articles
-export async function triggerArticleScrape(provider: ScraperProvider = 'firecrawl'): Promise<{
+export async function triggerArticleScrape(provider: ScraperProvider = 'lightpanda'): Promise<{
   success: boolean;
   stats?: {
     totalScraped: number;
@@ -315,7 +315,7 @@ export async function triggerArticleScrape(provider: ScraperProvider = 'firecraw
   };
 }
 
-export async function scrapeArticles(articles: Article[], provider: ScraperProvider = 'firecrawl'): Promise<ScrapeResult> {
+export async function scrapeArticles(articles: Article[], provider: ScraperProvider = 'lightpanda'): Promise<ScrapeResult> {
   const { data, error } = await supabase.functions.invoke('scrape-articles', {
     body: { articles, provider },
   });

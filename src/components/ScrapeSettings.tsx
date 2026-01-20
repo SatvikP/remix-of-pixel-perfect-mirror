@@ -224,7 +224,7 @@ export function ScrapeSettings({ provider, onProviderChange }: ScrapeSettingsPro
             </RadioGroup>
 
             <div className="text-xs text-muted-foreground pt-2 border-t">
-              <strong>Tip:</strong> Use Firecrawl for most sites. Switch to Lightpanda for sites with heavy JavaScript rendering or anti-bot protection.
+              <strong>Tip:</strong> Lightpanda is the default for most sites. Switch to Firecrawl if you experience issues with specific sources.
             </div>
           </CardContent>
         </CollapsibleContent>
