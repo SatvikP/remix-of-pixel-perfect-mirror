@@ -4,20 +4,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useNotifications } from '@/hooks/use-notifications';
+import { useProcessing } from '@/contexts/ProcessingContext';
 import { FileUploader } from '@/components/FileUploader';
 import { HierarchicalClusters } from '@/components/HierarchicalClusters';
 import { EnhancedStartupsTable } from '@/components/EnhancedStartupsTable';
-import { ProcessingStatus, ProcessingStep } from '@/components/ProcessingStatus';
+import { ProcessingStatus } from '@/components/ProcessingStatus';
 import { StatsCards } from '@/components/StatsCards';
 
 import { ScoringConfigurator } from '@/components/ScoringConfigurator';
 import { DomainFilter } from '@/components/DomainFilter';
 import { ScoreAnalysis } from '@/components/ScoreAnalysis';
 import { ScrapeSettings, ScraperProvider } from '@/components/ScrapeSettings';
-import { clusterStartups, parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen, loadDemoStartups, fetchUserProfile, setHasAnalyzed } from '@/lib/api';
-import type { Article, ScrapedArticle, ClusteringResult, Startup } from '@/lib/types';
-import { DEFAULT_SCORING_CONFIG, configToWeights, getParentCategoriesFromDomains, type ScoringConfig, type DomainOption } from '@/lib/scoring-config';
+import { parseCSV, fetchArticlesFromDatabase, triggerArticleScrape, fetchUserStartups, saveUserStartups, deleteUserStartups, updateLastSeen, loadDemoStartups, fetchUserProfile, setHasAnalyzed } from '@/lib/api';
+import type { Article, Startup } from '@/lib/types';
+import { DEFAULT_SCORING_CONFIG, getParentCategoriesFromDomains, type ScoringConfig, type DomainOption } from '@/lib/scoring-config';
 import siftedArticles from '@/data/sifted_articles.json';
 import { Sparkles, RotateCcw, RefreshCw, Database, FileText, LogOut, Trash2, Settings, LayoutDashboard, X, Filter, Plus, BookOpen, Rocket, Upload, Beaker, CheckCircle, Users } from 'lucide-react';
 import { FoundersAnalysis } from '@/components/FoundersAnalysis';
@@ -26,17 +26,23 @@ import type { User, Session } from '@supabase/supabase-js';
 
 export default function Index() {
   const { toast } = useToast();
-  const { requestPermission, sendNotification } = useNotifications();
+  const { 
+    processingStep, 
+    progress, 
+    statusMessage, 
+    error, 
+    result, 
+    isProcessing, 
+    processStartups, 
+    resetProcessing,
+    setResult 
+  } = useProcessing();
+  
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [processingStep, setProcessingStep] = useState<ProcessingStep>('idle');
-  const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState('');
-  const [error, setError] = useState<string | undefined>();
-  const [result, setResult] = useState<ClusteringResult | null>(null);
   const [activeCluster, setActiveCluster] = useState<number | null>(null);
   const [savedStartups, setSavedStartups] = useState<Startup[]>([]);
   const [isLoadingStartups, setIsLoadingStartups] = useState(true);
@@ -229,89 +235,39 @@ export default function Index() {
     setCsvFile(file);
     setResult(null);
     setActiveCluster(null);
-    setError(undefined);
-    setProcessingStep('idle');
-  }, []);
+    resetProcessing();
+  }, [resetProcessing, setResult]);
 
   const handleClearFile = useCallback(() => {
     setCsvFile(null);
     setResult(null);
     setActiveCluster(null);
-    setError(undefined);
-    setProcessingStep('idle');
-  }, []);
+    resetProcessing();
+  }, [resetProcessing, setResult]);
 
-  // Core processing function - can be used for both CSV upload and saved startups
-  const processStartups = useCallback(async (startups: Startup[], saveToDb: boolean = false) => {
-    try {
-      setError(undefined);
-      setResult(null);
-      
-      // Request notification permission when starting long-running operation
-      await requestPermission();
-
-      // Use database articles if available, otherwise fallback to static JSON
-      let articles: Article[];
-      if (dbArticles.length > 0) {
-        articles = dbArticles;
-        console.log(`Using ${articles.length} articles from database`);
-      } else {
-        articles = siftedArticles as Article[];
-        console.log(`Using ${articles.length} articles from static JSON (database empty)`);
+  // Wrapper to process startups with callbacks
+  const handleProcessStartups = useCallback(async (startups: Startup[], saveToDb: boolean = false) => {
+    await processStartups(
+      startups,
+      dbArticles,
+      scoringConfig,
+      hasAnalyzed ?? false,
+      {
+        onSaveToDb: saveToDb ? async () => {
+          const saved = await saveUserStartups(startups);
+          if (saved) {
+            setSavedStartups(startups);
+            console.log(`Saved ${startups.length} startups to database`);
+          }
+        } : undefined,
+        onMarkAnalyzed: async () => {
+          await setHasAnalyzed();
+          setHasAnalyzedState(true);
+        },
       }
-
-      setProcessingStep('scraping');
-      setProgress(25);
-      setStatusMessage(`Preparing ${articles.length} articles for analysis...`);
-      
-      // Convert Article[] to ScrapedArticle[] format
-      const articlesToUse: ScrapedArticle[] = articles.map(article => ({
-        url: article.url,
-        title: article.title,
-        excerpt: article.excerpt,
-        content: `${article.title}. ${article.excerpt}`,
-        scrapedAt: new Date().toISOString(),
-      }));
-
-      setProcessingStep('clustering');
-      setProgress(50);
-      setStatusMessage(`Clustering ${startups.length} startups into hierarchical sectors...`);
-
-      // Pass scoring weights to the clustering function
-      const scoringWeights = configToWeights(scoringConfig);
-      const clusterResult = await clusterStartups(articlesToUse, startups, 20, scoringWeights);
-      if (!clusterResult.success) throw new Error(clusterResult.error || 'Failed to cluster');
-
-      // Save startups to database if this is a new upload
-      if (saveToDb) {
-        const saved = await saveUserStartups(startups);
-        if (saved) {
-          setSavedStartups(startups);
-          console.log(`Saved ${startups.length} startups to database`);
-        }
-      }
-
-      setResult(clusterResult);
-      setProcessingStep('complete');
-      setActiveView('dashboard'); // Switch to dashboard after processing
-      
-      // Mark user as having analyzed (only updates DB if not already set)
-      if (!hasAnalyzed) {
-        await setHasAnalyzed();
-        setHasAnalyzedState(true);
-      }
-      
-      toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters across sectors.` });
-      sendNotification('Clustering Complete!', `Created ${clusterResult.stats.clustersCreated} clusters across sectors.`);
-
-    } catch (err) {
-      setProcessingStep('error');
-      const errorMessage = err instanceof Error ? err.message : 'Error occurred';
-      setError(errorMessage);
-      toast({ title: 'Failed', description: String(err), variant: 'destructive' });
-      sendNotification('Clustering Failed', errorMessage);
-    }
-  }, [dbArticles, scoringConfig, toast, hasAnalyzed, requestPermission, sendNotification]);
+    );
+    setActiveView('dashboard');
+  }, [dbArticles, scoringConfig, hasAnalyzed, processStartups]);
 
   // Auto-run analysis ONLY for first-time users who haven't analyzed yet
   useEffect(() => {
@@ -324,14 +280,14 @@ export default function Index() {
       processingStep === 'idle'
     ) {
       console.log('Auto-running analysis for first-time user with saved startups');
-      processStartups(savedStartups);
+      handleProcessStartups(savedStartups);
     }
-  }, [isLoadingStartups, articlesLoading, savedStartups, result, hasAnalyzed, processingStep, processStartups]);
+  }, [isLoadingStartups, articlesLoading, savedStartups, result, hasAnalyzed, processingStep, handleProcessStartups]);
 
   // Manual analyze handler for saved startups
   const handleAnalyzeSavedStartups = async () => {
     if (savedStartups.length === 0) return;
-    await processStartups(savedStartups);
+    await handleProcessStartups(savedStartups);
   };
 
   const handleProcess = async () => {
@@ -348,7 +304,7 @@ export default function Index() {
       return;
     }
 
-    await processStartups(startups, true); // Save to DB when uploading new CSV
+    await handleProcessStartups(startups, true); // Save to DB when uploading new CSV
   };
 
   const handleClearData = async () => {
@@ -358,8 +314,7 @@ export default function Index() {
       setCsvFile(null);
       setResult(null);
       setActiveCluster(null);
-      setError(undefined);
-      setProcessingStep('idle');
+      resetProcessing();
       setActiveView('settings');
       toast({ title: 'Data cleared', description: 'Your startup data has been deleted. Upload a new CSV to start again.' });
     } else {
@@ -371,11 +326,9 @@ export default function Index() {
     setCsvFile(null);
     setResult(null);
     setActiveCluster(null);
-    setError(undefined);
-    setProcessingStep('idle');
+    resetProcessing();
   };
 
-  const isProcessing = processingStep === 'scraping' || processingStep === 'clustering';
   const hasSavedStartups = savedStartups.length > 0;
   const hasResults = result !== null;
   
@@ -397,7 +350,7 @@ export default function Index() {
           description: `${demoStartups.length} stealth startups ready for analysis.` 
         });
         // Trigger auto-analysis
-        await processStartups(demoStartups);
+        await handleProcessStartups(demoStartups);
       } else {
         toast({ title: 'Failed to load demo data', variant: 'destructive' });
       }
