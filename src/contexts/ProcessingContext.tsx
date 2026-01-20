@@ -114,14 +114,14 @@ export function ProcessingProvider({ children }: { children: ReactNode }) {
       }
       
       toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters across sectors.` });
-      sendNotification('Clustering Complete!', `Created ${clusterResult.stats.clustersCreated} clusters across sectors.`);
+      sendNotification('Clustering Complete!', `Created ${clusterResult.stats.clustersCreated} clusters across sectors.`, '/?view=dashboard');
 
     } catch (err) {
       setProcessingStep('error');
       const errorMessage = err instanceof Error ? err.message : 'Error occurred';
       setError(errorMessage);
       toast({ title: 'Failed', description: String(err), variant: 'destructive' });
-      sendNotification('Clustering Failed', errorMessage);
+      sendNotification('Clustering Failed', errorMessage, '/?view=settings');
     }
   }, [toast, requestPermission, sendNotification]);
 
