@@ -391,8 +391,11 @@ export default function Story() {
 
           {/* Timeline */}
           <div className="relative max-w-4xl mx-auto">
-            {/* Vertical line */}
-            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 via-purple-500 to-amber-500 md:-translate-x-1/2" />
+            {/* Vertical line - stops before the phase legend */}
+            <div 
+              className="absolute left-4 md:left-1/2 top-0 w-0.5 bg-gradient-to-b from-indigo-500 via-purple-500 to-amber-500 md:-translate-x-1/2" 
+              style={{ height: 'calc(100% - 7rem)' }} 
+            />
 
             <div className="space-y-8">
               {timelineEvents.map((event, index) => {
