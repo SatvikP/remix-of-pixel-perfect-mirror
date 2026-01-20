@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { useNotifications } from '@/hooks/use-notifications';
 import { FileUploader } from '@/components/FileUploader';
 import { HierarchicalClusters } from '@/components/HierarchicalClusters';
 import { EnhancedStartupsTable } from '@/components/EnhancedStartupsTable';
@@ -25,6 +26,7 @@ import type { User, Session } from '@supabase/supabase-js';
 
 export default function Index() {
   const { toast } = useToast();
+  const { requestPermission, sendNotification } = useNotifications();
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -244,6 +246,9 @@ export default function Index() {
     try {
       setError(undefined);
       setResult(null);
+      
+      // Request notification permission when starting long-running operation
+      await requestPermission();
 
       // Use database articles if available, otherwise fallback to static JSON
       let articles: Article[];
@@ -297,13 +302,16 @@ export default function Index() {
       }
       
       toast({ title: 'Complete!', description: `Created ${clusterResult.stats.clustersCreated} clusters across sectors.` });
+      sendNotification('Clustering Complete!', `Created ${clusterResult.stats.clustersCreated} clusters across sectors.`);
 
     } catch (err) {
       setProcessingStep('error');
-      setError(err instanceof Error ? err.message : 'Error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'Error occurred';
+      setError(errorMessage);
       toast({ title: 'Failed', description: String(err), variant: 'destructive' });
+      sendNotification('Clustering Failed', errorMessage);
     }
-  }, [dbArticles, scoringConfig, toast, hasAnalyzed]);
+  }, [dbArticles, scoringConfig, toast, hasAnalyzed, requestPermission, sendNotification]);
 
   // Auto-run analysis ONLY for first-time users who haven't analyzed yet
   useEffect(() => {
