@@ -23,7 +23,9 @@ export function useNotifications() {
     notification.onclick = () => {
       window.focus();
       if (onClickPath) {
-        window.location.href = onClickPath;
+        // Use history API for SPA navigation to avoid full page reload
+        window.history.pushState({}, '', onClickPath);
+        window.dispatchEvent(new PopStateEvent('popstate'));
       }
       notification.close();
     };
