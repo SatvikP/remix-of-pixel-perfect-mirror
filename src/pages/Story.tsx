@@ -15,7 +15,106 @@ import {
   Clock,
   Users,
   Zap,
+  Rocket,
+  Lightbulb,
+  GitBranch,
+  Network,
+  Crown,
 } from "lucide-react";
+
+// Timeline data - easily editable
+interface TimelineEvent {
+  period: string;
+  title: string;
+  description: string;
+  phase: 'sprint' | 'growth' | 'vision';
+}
+
+const timelineEvents: TimelineEvent[] = [
+  { 
+    period: "Day 0", 
+    title: "Problem Discovery", 
+    description: "VC friend reaches out and defines a problem...", 
+    phase: "sprint" 
+  },
+  { 
+    period: "Day 0", 
+    title: "Validation", 
+    description: "Confirm with other VCs that this is a problem and find adjacent problems.", 
+    phase: "sprint" 
+  },
+  { 
+    period: "Day 1", 
+    title: "MVP Launch", 
+    description: "Build MVP of Startup trend analyzer and incorporate auto email with current events/trends.", 
+    phase: "sprint" 
+  },
+  { 
+    period: "Day 1", 
+    title: "Feedback Loop", 
+    description: "Resend to VCs to understand how we can improve.", 
+    phase: "sprint" 
+  },
+  { 
+    period: "Day 2", 
+    title: "CRM Integration", 
+    description: "Link product with CRM flow, track changes from day to day, keep VCs up to date.", 
+    phase: "sprint" 
+  },
+  { 
+    period: "Day 2", 
+    title: "Early Adopters", 
+    description: "Get real VCs onboard as early adopters.", 
+    phase: "sprint" 
+  },
+  { 
+    period: "Day 3", 
+    title: "Investor Pitch", 
+    description: "Pitch to investors.", 
+    phase: "sprint" 
+  },
+  { 
+    period: "Next Month", 
+    title: "Knowledge Graph", 
+    description: "Restructure data building knowledge graph for better network connections.", 
+    phase: "growth" 
+  },
+  { 
+    period: "6 Months", 
+    title: "Network Building", 
+    description: "Build strong network of founders, builders and VCs to communicate and find one another.", 
+    phase: "growth" 
+  },
+  { 
+    period: "1 Year", 
+    title: "Innovation Network", 
+    description: "Most fortified network of human innovation in the age of AI.", 
+    phase: "vision" 
+  },
+];
+
+const getPhaseStyles = (phase: TimelineEvent['phase']) => {
+  switch (phase) {
+    case 'sprint':
+      return {
+        badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-400/30',
+        node: 'from-indigo-500 to-blue-500',
+        glow: 'shadow-indigo-500/20',
+      };
+    case 'growth':
+      return {
+        badge: 'bg-purple-500/20 text-purple-300 border-purple-400/30',
+        node: 'from-purple-500 to-pink-500',
+        glow: 'shadow-purple-500/20',
+      };
+    case 'vision':
+      return {
+        badge: 'bg-amber-500/20 text-amber-300 border-amber-400/30',
+        node: 'from-amber-500 to-orange-500',
+        glow: 'shadow-amber-500/20',
+      };
+  }
+};
 interface Collaborator {
   name: string;
   role: string;
@@ -277,6 +376,75 @@ export default function Story() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        </section>
+
+        {/* Timeline Section */}
+        <section className="space-y-12">
+          <div className="text-center space-y-2">
+            <Badge variant="outline" className="border-indigo-400/50 text-indigo-300 bg-indigo-500/10 mb-4">
+              Our Journey
+            </Badge>
+            <h2 className="text-3xl font-bold text-white">From Idea to Innovation Network</h2>
+            <p className="text-white/50">Built at startup speed — here's how it happened.</p>
+          </div>
+
+          {/* Timeline */}
+          <div className="relative max-w-4xl mx-auto">
+            {/* Vertical line */}
+            <div className="absolute left-4 md:left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-500 via-purple-500 to-amber-500 md:-translate-x-1/2" />
+
+            <div className="space-y-8">
+              {timelineEvents.map((event, index) => {
+                const styles = getPhaseStyles(event.phase);
+                const isEven = index % 2 === 0;
+                
+                return (
+                  <div key={index} className="relative flex items-start gap-6 md:gap-0">
+                    {/* Node */}
+                    <div className={`absolute left-4 md:left-1/2 w-4 h-4 rounded-full bg-gradient-to-r ${styles.node} border-4 border-[hsl(245,60%,6%)] -translate-x-1/2 shadow-lg ${styles.glow} z-10`} />
+                    
+                    {/* Card - alternating sides on desktop */}
+                    <div className={`ml-10 md:ml-0 md:w-[45%] ${isEven ? 'md:mr-auto md:pr-8' : 'md:ml-auto md:pl-8'}`}>
+                      <Card className="bg-white/5 border-white/10 backdrop-blur-sm hover:bg-white/10 transition-all duration-300 group">
+                        <CardContent className="p-5 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <Badge variant="outline" className={`${styles.badge} text-xs font-medium`}>
+                              {event.period}
+                            </Badge>
+                            {event.phase === 'vision' && (
+                              <Crown className="h-4 w-4 text-amber-400" />
+                            )}
+                          </div>
+                          <h4 className="text-lg font-semibold text-white group-hover:text-indigo-300 transition-colors">
+                            {event.title}
+                          </h4>
+                          <p className="text-white/60 text-sm leading-relaxed">
+                            {event.description}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Phase Legend */}
+            <div className="flex flex-wrap justify-center gap-6 mt-12 pt-8 border-t border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500" />
+                <span className="text-white/50 text-sm">Sprint Phase (Days 0-3)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-purple-500 to-pink-500" />
+                <span className="text-white/50 text-sm">Growth Phase</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500" />
+                <span className="text-white/50 text-sm">Vision</span>
+              </div>
+            </div>
           </div>
         </section>
 
