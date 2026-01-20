@@ -2,8 +2,7 @@ import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-export type ProcessingStep = 'idle' | 'scraping' | 'clustering' | 'complete' | 'error';
+import type { ProcessingStep } from '@/contexts/ProcessingContext';
 
 interface ProcessingStatusProps {
   step: ProcessingStep;
