@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -48,8 +48,21 @@ export default function Index() {
   const [isLoadingStartups, setIsLoadingStartups] = useState(true);
   const [hasAnalyzed, setHasAnalyzedState] = useState<boolean | null>(null); // null = loading
   
-  // View state - 'settings' for upload/config, 'dashboard' for results, 'founders' for LinkedIn analysis
-  const [activeView, setActiveView] = useState<'settings' | 'dashboard' | 'founders'>('settings');
+  // View state - URL-based to persist across navigation
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewParam = searchParams.get('view');
+  
+  const activeView = useMemo(() => {
+    if (viewParam === 'dashboard' || viewParam === 'founders' || viewParam === 'settings') {
+      return viewParam;
+    }
+    // If result exists, default to dashboard; otherwise settings
+    return result ? 'dashboard' : 'settings';
+  }, [viewParam, result]);
+  
+  const setActiveView = useCallback((view: 'settings' | 'dashboard' | 'founders') => {
+    setSearchParams({ view });
+  }, [setSearchParams]);
   
   // Article state
   const [dbArticles, setDbArticles] = useState<Article[]>([]);
