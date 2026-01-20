@@ -8,6 +8,7 @@ import { ProcessingProvider } from "./contexts/ProcessingContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Story from "./pages/Story";
+import Presentation from "./pages/Presentation";
 import NotFound from "./pages/NotFound";
 
 const App = () => {
@@ -24,6 +25,7 @@ const App = () => {
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/story" element={<Story />} />
+              <Route path="/presentation" element={<Presentation />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
