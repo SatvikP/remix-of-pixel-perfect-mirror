@@ -431,7 +431,7 @@ export default function Story() {
             </div>
 
             {/* Phase Legend */}
-            <div className="flex flex-wrap justify-center gap-6 mt-12 pt-8 border-t border-white/10">
+            <div className="flex flex-wrap justify-center gap-6 mt-16 pt-10 border-t border-white/10">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-gradient-to-r from-indigo-500 to-blue-500" />
                 <span className="text-white/50 text-sm">Sprint Phase (Days 0-3)</span>
