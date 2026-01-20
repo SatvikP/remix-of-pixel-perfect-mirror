@@ -1,67 +1,59 @@
 
-## Diagnosis (from logs + current code)
-- The edge function is calling Dust endpoints like:
-  - `POST https://dust.tt/api/v1/w/{workspaceId}/conversations`
-  - `POST https://dust.tt/api/v1/w/{workspaceId}/conversations/{cId}/messages`
-  - `GET  https://dust.tt/api/v1/w/{workspaceId}/conversations/{cId}/events`
-- Dust’s Assistant API endpoints require the **`/assistant/`** segment, and message event streaming is **per-message**, not per-conversation. Because of the wrong paths, Dust returns an HTML **404 page** (exactly what your logs show), so all 35 profiles fail at “create conversation”.
 
-## Plan: Fix `analyze-linkedin-profiles` Dust API integration
+## Fix: Add Detailed Error Logging for AI Matching Step
 
-### 1) Update API URLs to correct Dust Assistant endpoints
-In `supabase/functions/analyze-linkedin-profiles/index.ts`, change:
-- Create conversation:
-  - FROM: `/api/v1/w/{wId}/conversations`
-  - TO:   `/api/v1/w/{wId}/assistant/conversations`
-- Create message:
-  - FROM: `/api/v1/w/{wId}/conversations/{cId}/messages`
-  - TO:   `/api/v1/w/{wId}/assistant/conversations/{cId}/messages`
-- Events:
-  - FROM: `/api/v1/w/{wId}/conversations/{cId}/events`
-  - TO:   `/api/v1/w/{wId}/assistant/conversations/{cId}/messages/{mId}/events`
+### Problem
+The current code only logs "AI matching error" without capturing the actual HTTP status code or error response body, making debugging impossible.
 
-### 2) Fix request payload shape for “create message”
-Align the body with Dust’s API shape (their docs commonly wrap data under a `message` object). Concretely:
-- Include `mentions: [{ configurationId: DUST_AGENT_ID }]`
-- Include `content`
-- Include `context` (your current context object is fine, just place it under the right nesting if required)
-- Add `blocking: true` if supported by the endpoint so the API waits for completion (otherwise we’ll rely on streaming events parsing).
+### Solution
+Enhance error logging on line 336-342 of `supabase/functions/cluster-startups/index.ts` to capture and log the actual error details.
 
-### 3) Use the returned Message ID and fetch message events correctly
-Right now you define `DustMessageResponse` but never read it.
-- Parse the message creation response to capture `message.sId` (call it `messageId`).
-- Call the message events endpoint:  
-  `GET /assistant/conversations/{cId}/messages/{mId}/events`
+### Changes
 
-### 4) Handle streaming events properly (avoid assuming JSON list)
-Dust “events” endpoints are documented as **streaming**.
-Implement one of these robust approaches:
-- **Preferred**: Stream-read the response body (SSE/text stream) and accumulate events until you see an event type like `agent_message_success`, then extract the assistant content.
-- **Fallback**: If Dust also supports a non-streaming “blocking=true” mode that returns final content, use that and skip streaming.
+**File: `supabase/functions/cluster-startups/index.ts`**
 
-### 5) Improve error visibility (so we don’t get silent 35-failure batches again)
-Add structured logging + response capture:
-- Log:
-  - HTTP status
-  - URL called
-  - response `content-type`
-  - first ~500 chars of response text when non-2xx
-- Return per-profile error details including whether it failed at:
-  - conversation_create / message_create / events_stream / parse_json / timeout
+Replace the current error handling (lines 336-342):
+```typescript
+if (!matchResponse.ok) {
+  console.error('AI matching error');
+  return new Response(
+    JSON.stringify({ success: false, error: 'AI startup matching failed' }),
+    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+```
 
-### 6) Add timeouts and rate-limit handling
-- Wrap each external fetch with an AbortController timeout (e.g., 20–30s).
-- If Dust rate limits (429), implement exponential backoff retry a few times per profile.
-- Keep sequential processing, but add slightly longer delay (e.g., 800–1200ms) if you see throttling.
+With detailed error handling (similar to lines 197-217 for the cluster step):
+```typescript
+if (!matchResponse.ok) {
+  const errorText = await matchResponse.text();
+  console.error('AI matching error:', matchResponse.status, errorText);
+  
+  if (matchResponse.status === 429) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Rate limit exceeded during matching. Please try again later.' }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  if (matchResponse.status === 402) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Payment required. Please add credits to continue.' }),
+      { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+  
+  return new Response(
+    JSON.stringify({ success: false, error: `AI startup matching failed: ${matchResponse.status}` }),
+    { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+```
 
-### 7) Validate end-to-end quickly
-After implementing:
-1. Trigger analyze with 1–2 founders.
-2. Confirm stats show `succeeded > 0`.
-3. Scale to 35 again.
+### Benefits
+1. **Better debugging**: Logs will show exact HTTP status (429, 402, 500, etc.) and error message
+2. **User-friendly errors**: Different error messages for rate limits vs payment issues vs generic failures
+3. **Consistent handling**: Matches the error handling pattern already used for the clustering step (lines 197-217)
 
-## Critical Files for Implementation
-- `supabase/functions/analyze-linkedin-profiles/index.ts` — Primary fix: correct endpoints, message ID handling, streaming event parsing, better errors/timeouts.
-- `src/lib/api.ts` — Ensure the client displays returned error details cleanly if some profiles fail.
-- `src/components/FoundersAnalysis.tsx` — Improve UI feedback (e.g., show first failing reason, allow retry failed only).
-- `supabase/config.toml` — Ensure the function remains enabled/configured (no major change expected).
+### Critical Files for Implementation
+- `supabase/functions/cluster-startups/index.ts` - Add detailed error logging at line 336-342
+
