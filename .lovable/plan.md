@@ -1,78 +1,216 @@
 
 
-## Fix Results Persistence Across Navigation
+# Plan: Create Comprehensive README Documentation
 
-### Problem
-When a logged-in user navigates from Dashboard to "Our Story" and back, they lose sight of their results because:
-1. The `activeView` state resets to `'settings'` on every component remount
-2. There's no URL parameter handling to restore the correct view
-3. The `result` data IS persisted in ProcessingContext, but the UI doesn't show it
+## Overview
 
-### Solution
-Implement URL-based view state management using React Router's `useSearchParams`. This approach:
-- Syncs `activeView` with the URL (e.g., `/?view=dashboard`)
-- Survives page navigation and browser refresh
-- Works seamlessly with the existing notification click handlers
-- Provides shareable/bookmarkable view states
+This plan creates a detailed README.md file that explains the FundRadar project - an AI-powered startup trend analysis platform designed for venture capital investors. The README will document all technologies, architecture, features, and setup instructions.
 
-### Implementation Details
+## README Structure
 
-#### 1. Update `src/pages/Index.tsx`
+### 1. Project Header and Overview
+- Project name, tagline, and live URL
+- Brief description of what FundRadar does
+- Key value proposition for investors
 
-**Add URL Parameter Handling:**
-```typescript
-import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+### 2. Features Section
+- **AI-Powered Trend Analysis**: Clusters 350+ daily news articles into hierarchical sectors
+- **Startup Scoring**: Investment scores based on trend alignment, market timing, and sector fit
+- **Multi-Source Scraping**: 22 EU startup news sources with Lightpanda/Firecrawl providers
+- **Founder Analysis**: LinkedIn profile enrichment via Dust AI Agent
+- **Configurable Scoring**: Customizable metric weights across Market, Startup, and Trend categories
+- **Domain Filtering**: Filter results by sectors (biotech, fintech, saas, etc.)
+- **Data Persistence**: User startup data saved and preserved across sessions
 
-// Replace useState for activeView with URL-based state
-const [searchParams, setSearchParams] = useSearchParams();
-const viewParam = searchParams.get('view');
+### 3. Technology Stack
 
-// Derive activeView from URL, defaulting smartly based on state
-const activeView = useMemo(() => {
-  if (viewParam === 'dashboard' || viewParam === 'founders' || viewParam === 'settings') {
-    return viewParam;
-  }
-  // If result exists, default to dashboard; otherwise settings
-  return result ? 'dashboard' : 'settings';
-}, [viewParam, result]);
+**Frontend:**
+| Technology | Purpose |
+|------------|---------|
+| React 18 | UI framework |
+| TypeScript | Type safety |
+| Vite | Build tool and dev server |
+| Tailwind CSS | Styling |
+| shadcn/ui | Component library (Radix UI primitives) |
+| React Router DOM | Client-side routing |
+| TanStack Query | Server state management |
+| Recharts | Data visualization |
+| date-fns | Date utilities |
 
-// Create a setter function that updates URL params
-const setActiveView = useCallback((view: 'settings' | 'dashboard' | 'founders') => {
-  setSearchParams({ view });
-}, [setSearchParams]);
+**Backend (Lovable Cloud / Supabase):**
+| Technology | Purpose |
+|------------|---------|
+| Supabase | Database, Auth, Edge Functions |
+| PostgreSQL | Database with RLS policies |
+| Deno | Edge function runtime |
+| Lovable AI Gateway | AI model access (Gemini, GPT) |
+
+**External Integrations:**
+| Service | Purpose |
+|---------|---------|
+| Lightpanda | Primary web scraping (Puppeteer-based) |
+| Firecrawl | Alternative scraper |
+| Dust AI | LinkedIn profile analysis agent |
+| Google OAuth | Authentication provider |
+
+### 4. Architecture Diagram (ASCII)
+
+```
++---------------------+     +----------------------+     +------------------+
+|     Frontend        |     |    Edge Functions    |     |   External APIs  |
+|  (React + Vite)     |     |       (Deno)         |     |                  |
++---------------------+     +----------------------+     +------------------+
+         |                           |                          |
+         v                           v                          v
++-------------------------------------------------------------------+
+|                        Supabase (Lovable Cloud)                    |
+|  +-------------+  +---------------+  +---------------------------+ |
+|  | PostgreSQL  |  | Auth (Google) |  | Edge Functions            | |
+|  | - articles  |  | - Email/Pass  |  | - cluster-startups        | |
+|  | - user_     |  |               |  | - scrape-lightpanda       | |
+|  |   startups  |  |               |  | - scrape-sifted-daily     | |
+|  | - user_     |  |               |  | - scrape-articles         | |
+|  |   profiles  |  |               |  | - analyze-linkedin        | |
+|  +-------------+  +---------------+  | - send-outreach-email     | |
+|                                      +---------------------------+ |
++-------------------------------------------------------------------+
 ```
 
-**Remove the old useState line:**
-```typescript
-// DELETE THIS LINE:
-const [activeView, setActiveView] = useState<'settings' | 'dashboard' | 'founders'>('settings');
+### 5. Database Schema
+
+**Tables:**
+- `articles`: Scraped news articles with metadata (source, tags, authors, excerpt)
+- `user_startups`: User-uploaded startup data with RLS per user
+- `user_profiles`: User engagement tracking (signup, demo usage, analysis flags)
+- `user_roles`: Role-based access control (admin, user)
+
+### 6. Edge Functions Documentation
+
+| Function | Description |
+|----------|-------------|
+| `cluster-startups` | AI clustering using Gemini 3 Flash - creates hierarchical trend clusters and calculates investment scores |
+| `scrape-lightpanda` | Puppeteer-based scraping via Lightpanda Cloud WebSocket |
+| `scrape-sifted-daily` | Daily scraper for 22 EU news sources |
+| `scrape-articles` | Firecrawl-based article scraping |
+| `analyze-linkedin-profiles` | Dust AI agent integration for founder enrichment |
+| `send-outreach-email` | Email outreach functionality |
+
+### 7. Scoring System Explanation
+
+**Investment Score Calculation:**
+1. **Phase 1 - Cluster Identification**: AI analyzes articles into ~20 hierarchical clusters with trend scores
+2. **Phase 2 - Startup Matching**: Startups matched to clusters based on keywords, tags, and business type
+
+**Core Metrics (0-100 total):**
+- Trend Alignment (0-40): How well startup aligns with trending clusters
+- Market Timing (0-30): Market readiness signals
+- Sector Fit (0-30): Quality of sector match
+
+**Derived Metrics:**
+- Market Momentum (0-15): Based on average cluster trend scores
+- Funding Climate (0-10): Inferred from sector activity
+
+### 8. Project Structure
+
+```
+src/
+├── components/          # React components
+│   ├── ui/              # shadcn/ui primitives
+│   ├── HierarchicalClusters.tsx
+│   ├── EnhancedStartupsTable.tsx
+│   ├── ScoringConfigurator.tsx
+│   ├── ScoreAnalysis.tsx
+│   └── ...
+├── contexts/            # React contexts
+│   └── ProcessingContext.tsx  # Long-running task state
+├── hooks/               # Custom hooks
+├── lib/                 # Utilities and API functions
+│   ├── api.ts           # Supabase API calls
+│   ├── types.ts         # TypeScript interfaces
+│   ├── scoring-config.ts
+│   └── utils.ts
+├── pages/               # Route components
+│   ├── Index.tsx        # Main dashboard
+│   ├── Auth.tsx         # Authentication
+│   └── Story.tsx        # Company story
+├── data/                # Static data
+│   ├── demo_startups.json
+│   └── sifted_articles.json
+└── integrations/
+    └── supabase/        # Auto-generated Supabase types
+
+supabase/
+├── config.toml          # Supabase configuration
+├── migrations/          # Database migrations
+└── functions/           # Deno edge functions
+    ├── cluster-startups/
+    ├── scrape-lightpanda/
+    ├── scrape-sifted-daily/
+    ├── scrape-articles/
+    ├── analyze-linkedin-profiles/
+    └── send-outreach-email/
 ```
 
-**Update handleProcessStartups to use URL navigation:**
-```typescript
-// Change from:
-setActiveView('dashboard');
-// To:
-setSearchParams({ view: 'dashboard' });
+### 9. Environment Variables
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-#### 2. Update navigation buttons to use setSearchParams
+**Edge Function Secrets (configured in Lovable Cloud):**
+- `LIGHTPANDA_TOKEN` - Lightpanda Cloud authentication
+- `FIRECRAWL_API_KEY` - Firecrawl scraper access
+- `DUST_API_KEY`, `DUST_WORKSPACE_ID`, `DUST_AGENT_ID` - Dust AI integration
+- `LOVABLE_API_KEY` - Lovable AI Gateway for Gemini/GPT models
+- `RESEND_API_KEY` - Email sending
 
-The existing `setActiveView` calls will work since we're replacing it with a function of the same signature.
+### 10. Getting Started / Local Development
 
-### Changes Summary
+```bash
+# Clone and install
+git clone <repo-url>
+cd fundradar
+npm install
 
-| File | Changes |
-|------|---------|
-| `src/pages/Index.tsx` | Replace `useState` for `activeView` with `useSearchParams` hook, add smart defaulting logic |
+# Start development server
+npm run dev
+```
 
-### Benefits
-- Results persist visually when navigating back from Story page
-- URL reflects current view state (bookmarkable)
-- Notification clicks work correctly with `/?view=dashboard`
-- Browser back/forward buttons work as expected
-- No additional API calls or re-analysis triggered
+### 11. Key User Flows
 
-### Critical Files for Implementation
-- `src/pages/Index.tsx` - Main file to modify, replace activeView state management with URL-based approach
+1. **New User Flow**: Sign up → Upload CSV → Auto-analyze → View Dashboard
+2. **Returning User Flow**: Login → View persisted results or re-analyze
+3. **Demo Flow**: Try demo data → See analysis → Upload own data
+
+### 12. Deployment
+
+- Frontend: Deployed via Lovable publish
+- Backend: Edge functions auto-deploy on code changes
+- Database: Managed by Lovable Cloud
+
+---
+
+## Critical Files for Implementation
+
+- `README.md` - The file to create/replace with comprehensive documentation
+- `src/pages/Index.tsx` - Main application flow reference
+- `supabase/functions/cluster-startups/index.ts` - Core AI logic documentation
+- `src/lib/types.ts` - Type definitions to document
+- `src/lib/scoring-config.ts` - Scoring system configuration
+
+---
+
+## Implementation Notes
+
+The README will be approximately 300-400 lines, covering:
+- High-level project overview
+- Complete technology stack
+- Architecture diagrams
+- Database schema
+- All edge functions
+- Scoring algorithm explanation
+- Project structure
+- Setup instructions
+- Environment configuration
 
