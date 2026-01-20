@@ -88,7 +88,7 @@ const timelineEvents: TimelineEvent[] = [
   { 
     period: "1 Year", 
     title: "Innovation Network", 
-    description: "Most fortified network of human innovation in the age of AI.", 
+    description: "Fortified network of human innovation in the age of AI.", 
     phase: "vision" 
   },
 ];
