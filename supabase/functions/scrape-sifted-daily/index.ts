@@ -150,7 +150,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
-    const provider: ScraperProvider = body.provider || 'firecrawl';
+    const provider: ScraperProvider = body.provider || 'lightpanda';
     
     const firecrawlKey = Deno.env.get("FIRECRAWL_API_KEY");
     if (!firecrawlKey) throw new Error("FIRECRAWL_API_KEY not configured");

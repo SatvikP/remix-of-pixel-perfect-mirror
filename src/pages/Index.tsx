@@ -53,7 +53,7 @@ export default function Index() {
   // Scraper provider state
   const [scraperProvider, setScraperProvider] = useState<ScraperProvider>(() => {
     const saved = localStorage.getItem('scraper_provider');
-    return (saved === 'lightpanda' ? 'lightpanda' : 'firecrawl') as ScraperProvider;
+    return (saved === 'firecrawl' ? 'firecrawl' : 'lightpanda') as ScraperProvider;
   });
   
   // Scoring configuration state
